@@ -1,3 +1,6 @@
+# ignore the guidance folder, which contains examples of finished reports
+/guidance/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
