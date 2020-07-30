@@ -7,3 +7,4 @@ Created on Tue Jul 28 17:19:21 2020
 """
 
 from helpers import *
+from report_image_generation import *

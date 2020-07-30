@@ -33,3 +33,24 @@ def str_time_elapsed(start):
     out = now - start
     pretty = round(out/60, 2)
     return pretty
+
+
+def any_in_str(s, l):
+    """
+    Returns whether any of a list of substrings is in a string
+    
+
+    Parameters
+    ----------
+    s : str
+        string to look for substrings in.
+    l : list of str
+        substrings to check for in s.
+
+    Returns
+    -------
+    bool
+
+    """
+    
+    return any([substr in s for substr in l])

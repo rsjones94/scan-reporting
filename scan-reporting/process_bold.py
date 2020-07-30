@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8 -*-
 """
-This script takes raw scan data for moyamoya patients and processes it completely.
+This script takes raw scan data for BOLD scans and processes it completely.
 This involves:
     1) deidentifying the scans
     2) generating derived images - CBF, CVR, CVR_Max, and CVR_Delay images in native space, T1 space, and 4 mm MNI space.
@@ -28,8 +28,10 @@ import getopt
 import subprocess
 import time
 import datetime
+import glob
+import shutil
 
-from helpers import get_terminal, str_time_elapsed
+from helpers import get_terminal, str_time_elapsed, any_in_str
 
 bash_input = sys.argv[1:]
 options, remainder = getopt.getopt(bash_input, "i:n:s:", ["infolder=","name=",'steps='])
@@ -159,10 +161,44 @@ if '4' in steps:
 
 if '5' in steps:
     ##### step 5 : reporting image generation
+    ## FLAIR, CBF, CVR, CVRmax, CVRdelay
+    # EtCO2 and OEF?
     
     print(f'\nStep 5: generating reporting images')
     
-    pass
+    reporting_folder = os.path.join(in_folder, 'reporting_images')
+    conversion_folder = os.path.join(reporting_folder, 'gathered')
+    if os.path.exists(reporting_folder):
+        shutil.rmtree(reporting_folder)
+    os.mkdir(reporting_folder)
+    os.mkdir(conversion_folder)
+    
+    signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
+                                   {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR'},
+                               ('CBF',):
+                                   {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                               ('CBR',):
+                                   {'basename': 'CBR', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                               ('unknown1',):
+                                   {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                               ('unknown2',):
+                                   {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                              }
+        
+    
+
+    for signature, subdict in signature_relationships.items():
+        
+        candidates = []
+        # note that the signature matching includes the full path. probably not a great idea
+        for subsig in signature:
+            where_glob= os.path.join(in_folder, subdict['isin'], f'*{subsig}*.{subdict["ext"]}')
+            potential = glob.glob(where_glob)
+            potential = [f for f in potential if not any_in_str(f, subdict['excl'])]
+            candidates.extend(potential)
+            
+        # next: convert if needed and move to the conversion folder
+    
     
     print(f'\nReporting images generated. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
     
