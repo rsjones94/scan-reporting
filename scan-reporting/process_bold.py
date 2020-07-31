@@ -32,6 +32,7 @@ import glob
 import shutil
 
 from helpers import get_terminal, str_time_elapsed, any_in_str
+from report_image_generation import par2nii, nii_image
 
 bash_input = sys.argv[1:]
 options, remainder = getopt.getopt(bash_input, "i:n:s:", ["infolder=","name=",'steps='])
@@ -174,15 +175,15 @@ if '5' in steps:
     os.mkdir(conversion_folder)
     
     signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
-                                   {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR'},
+                                   {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':'gray', 'dims':(4,6)},
                                ('CBF',):
-                                   {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                                   {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
                                ('CBR',):
-                                   {'basename': 'CBR', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                                   {'basename': 'CBR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
                                ('unknown1',):
-                                   {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                                   {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
                                ('unknown2',):
-                                   {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz'},
+                                   {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
                               }
         
     
@@ -192,12 +193,28 @@ if '5' in steps:
         candidates = []
         # note that the signature matching includes the full path. probably not a great idea
         for subsig in signature:
-            where_glob= os.path.join(in_folder, subdict['isin'], f'*{subsig}*.{subdict["ext"]}')
+            where_glob = os.path.join(in_folder, subdict['isin'], f'*{subsig}*.{subdict["ext"]}')
             potential = glob.glob(where_glob)
             potential = [f for f in potential if not any_in_str(f, subdict['excl'])]
             candidates.extend(potential)
             
-        # next: convert if needed and move to the conversion folder
+        if candidates:
+            foi = candidates[-1] # pick the last in list. file of interest
+        else:
+            continue
+        
+        new_stem = f'{subdict["basename"]}.nii.gz'
+        new_name = os.path.join(conversion_folder, new_stem)
+        
+        if subdict['ext'] == 'PAR':
+            moved_name = par2nii(foi, conversion_folder)
+            os.rename(moved_name, new_name)
+        else:
+            shutil.copy(foi, new_name)
+            
+        im_name = os.path.join(reporting_folder, f'{subdict["basename"]}_report_image.png')
+        nii_image(new_name, subdict['dims'], im_name, cmap=subdict['cmap'])
+            
     
     
     print(f'\nReporting images generated. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
