@@ -176,13 +176,13 @@ if '5' in steps:
     
     signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
                                    {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':'gray', 'dims':(4,6)},
-                               ('CBF',):
+                               ('CBF_MNI',):
                                    {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
-                               ('CBR',):
-                                   {'basename': 'CBR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
-                               ('unknown1',):
+                               ('ZSTAT1_MNI_normalized',):
+                                   {'basename': 'CVR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
+                               ('ZMAX2STANDARD_normalized',):
                                    {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
-                               ('unknown2',):
+                               ('TMAX2STANDARD',):
                                    {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
                               }
         
