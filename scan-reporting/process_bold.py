@@ -31,6 +31,8 @@ import datetime
 import glob
 import shutil
 
+import matplotlib
+
 from helpers import get_terminal, str_time_elapsed, any_in_str
 from report_image_generation import par2nii, nii_image
 
@@ -175,15 +177,15 @@ if '5' in steps:
     os.mkdir(conversion_folder)
     
     signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
-                                   {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':'gray', 'dims':(4,6)},
+                                   {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':matplotlib.cm.gray, 'dims':(4,6)},
                                ('CBF_MNI',):
-                                   {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
+                                   {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                                ('ZSTAT1_MNI_normalized',):
-                                   {'basename': 'CVR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
+                                   {'basename': 'CVR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                                ('ZMAX2STANDARD_normalized',):
-                                   {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
+                                   {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                                ('TMAX2STANDARD',):
-                                   {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':'rainbow', 'dims':(3,10)},
+                                   {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                               }
         
     
@@ -193,8 +195,8 @@ if '5' in steps:
         candidates = []
         # note that the signature matching includes the full path. probably not a great idea
         for subsig in signature:
-            where_glob = os.path.join(in_folder, subdict['isin'], f'*{subsig}*.{subdict["ext"]}')
-            potential = glob.glob(where_glob)
+            where_glob = os.path.join(in_folder, subdict['isin'], "**", f'*{subsig}*.{subdict["ext"]}')
+            potential = glob.glob(where_glob, recursive=True)
             potential = [f for f in potential if not any_in_str(f, subdict['excl'])]
             candidates.extend(potential)
             

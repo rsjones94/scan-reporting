@@ -11,6 +11,7 @@ import os
 import itertools
 
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import nibabel as nib
 from scipy import ndimage
@@ -35,7 +36,7 @@ def filter_zeroed_axial_slices(nii_data):
     keep = []
     for i in range(nii_data.shape[2]):
         d = nii_data[:,:,i]
-        if not (d==0).all() and not (np.isnan(d).any()):
+        if not ((np.isclose(d,0)).all() or (d <= 0).all()) and not (np.isnan(d).any()):
             keep.append(True)
         else:
             keep.append(False)
@@ -44,7 +45,7 @@ def filter_zeroed_axial_slices(nii_data):
     return new
 
 
-def nii_image(nii, dimensions, out_name, cmap, fltr=(0.5,99.5)):
+def nii_image(nii, dimensions, out_name, cmap):
     """
     Produces a png representing multiple AXIAL slices of a NiFTI
 
@@ -58,18 +59,19 @@ def nii_image(nii, dimensions, out_name, cmap, fltr=(0.5,99.5)):
         name of the output image.
     cmap : str or matplotlib cmap
         matplotlib color map.
-    fltr : tuple of float
-        tuple indicating what the lower and upper percentiles of intensities should be used
-        set as the max and min of the plot
 
     Returns
     -------
     None.
 
     """
+    
+    plt.style.use('dark_background')
+    
     img = nib.load(nii)
-    data = img.get_data()
+    data = img.get_fdata()
     data = filter_zeroed_axial_slices(data)
+    
     num_slices = data.shape[2] - 1 # num of axial slices
     
     d0, d1 = dimensions
@@ -91,8 +93,6 @@ def nii_image(nii, dimensions, out_name, cmap, fltr=(0.5,99.5)):
         if 0 in (d0, d1):
             raise Exception('Subplot dimensions cannot include 0')
         
-        
-        
     step = (num_slices - 0) / (num_subs - 1)
     frames = [int(0 + step * i) for i in range(num_subs)]
     
@@ -101,26 +101,40 @@ def nii_image(nii, dimensions, out_name, cmap, fltr=(0.5,99.5)):
     
     subplots = list(itertools.product(d0_l, d1_l))
     
+    
     mult = 3
+    
     fig, ax = plt.subplots(d0, d1, figsize=(d1*mult,d0*mult))
     
-    vmin, vmax = [int(i) for i in np.nanpercentile(data, fltr)]
+    if cmap != matplotlib.cm.gray:
+        vmin, vmax = [0, round(data.max(),2)]
+    else:
+        vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
+    
+    plt.subplots_adjust(wspace=0.000, hspace=0.000)
     
     # print(vmin,vmax)
     
     # print(frames)
     # print(data.shape)
     
+        
+    cmap.set_bad('black',1.)
     for (i,j), f in zip(subplots, frames):
         ax_slice = ndimage.rotate(data[:,:,f].T, 180)
+        ax_slice[np.isclose(ax_slice,0)] = np.nan
+        ax_slice[ax_slice < 0] = np.nan
         im = ax[i][j].imshow(ax_slice, interpolation='nearest', cmap=cmap, vmin=vmin, vmax=vmax)
         ax[i][j].axis('off')
         
-    plt.subplots_adjust(wspace=0.025, hspace=0.025)
+    plt.tight_layout(3.5)
     
-    if cmap != 'gray':
-        cbar_ax = fig.add_axes([0.91, 0.15, 0.01, 0.7])
+    if cmap != matplotlib.cm.gray:
+        cbar_ax = fig.add_axes([0.975, 0.15, 0.01, 0.7])
         fig.colorbar(im, cbar_ax)
+    else:
+        pass
+        
 
     plt.savefig(out_name)
     
