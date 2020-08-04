@@ -33,6 +33,8 @@ import shutil
 
 from pptx import Presentation
 import matplotlib
+import matplotlib.pyplot as plt
+import pandas as pd
 
 from helpers import get_terminal, str_time_elapsed, any_in_str, replace_in_ppt, analyze_ppt, add_ppt_image, add_ppt_image_ph
 from report_image_generation import par2nii, nii_image
@@ -224,7 +226,26 @@ if '6' in steps:
     
     print(f'\nStep 6: generating powerpoint')
     
-    template_loc = r'/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/TEMPLATE_BOLD.pptx'
+    
+    # make the etco2 trace
+    etco2_file = os.path.join(in_folder, 'etco2.csv')
+    etco2_fig = os.path.join(reporting_folder, 'etco2.png')
+    
+    etco2_data = pd.read_csv(etco2_file)
+    dynamics = etco2_data.iloc[:, 0]
+    co2 = etco2_data.iloc[:, 1]
+    
+    plt.figure(figsize=((12,8)))
+    plt.plot(dynamics, co2, lw=1)
+    plt.scatter(dynamics, co2, color='black')
+    plt.ylabel('EtCO2 (mmHg)')
+    plt.xlabel('Dynamic Scan')
+    plt.tight_layout()
+    plt.savefig(etco2_fig)
+    plt.close()
+    
+    
+    template_loc = r'/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/TEMPLATE_BOLD_PLACEHOLDERS.pptx'
     template_out = os.path.join(in_folder, f'{pt_id}_report.pptx')
     
     shutil.copyfile(template_loc, template_out)
@@ -241,6 +262,7 @@ if '6' in steps:
     Sldie 7: CVRmax
     Slide 8: CVRdelay
     Slide 10: CVR video
+    Slide 11: EtCO2
     """
     
     pres = Presentation(template_out)
@@ -253,6 +275,11 @@ if '6' in steps:
     movie_slide = 9
     add_ppt_image(pres.slides[movie_slide], movie, insert_type='mov', poster=im_names[0])
     """
+    
+    etco2_slide = 10
+    
+    slides.append(etco2_slide)
+    im_names.append(etco2_fig)
     
     
     for slide, name in zip(slides, im_names):

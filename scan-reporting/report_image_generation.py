@@ -126,17 +126,44 @@ def nii_image(nii, dimensions, out_name, cmap):
         ax[i][j].axis('off')
     
     
-    matplotlib.rcParams.update({'font.size': 22})
-    plt.tight_layout(0.6)
+    matplotlib.rcParams.update({'font.size': 32})
+    plt.tight_layout(0.8)
     
     if cmap != matplotlib.cm.gray:
-        cbar_ax = fig.add_axes([0.1,0.04,0.8,0.015])
-        fig.colorbar(im, cbar_ax, orientation='horizontal')
+        """
+        round the scaling to nearest 10 for CBF, nearest 0.1 for CVR and CVRMax, and nearest 10 for CVRDelay. 
+        """
+        if vmax > 100:
+            rounder = 1
+            by = 20
+        elif vmax > 50:
+            rounder = 1
+            by = 10
+        elif vmax > 10:
+            rounder = 1
+            by = 5
+        elif vmax > 1:
+            rounder = 2
+            by = 0.5
+        else:
+            rounder = 2
+            by = 0.1
+            
+        tks = list(np.arange(0, vmax, by))
+        tks.append(round(vmax,rounder))
+        
+        if tks[-1] - tks[-2] < 0.25*by:
+            del tks[-2] # if the last two ticks are very close together, delete the penultimate tick
+        
+        cbar_ax = fig.add_axes([0.1,0.055,0.8,0.015])
+        fig.colorbar(im, cbar_ax, orientation='horizontal', ticks=tks)
     else:
         pass
     
     plt.subplots_adjust(wspace=0.000, hspace=0.000)
 
     plt.savefig(out_name)
+    
+    plt.rcParams.update(plt.rcParamsDefault)
     
     
