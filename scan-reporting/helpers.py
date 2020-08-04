@@ -61,6 +61,59 @@ def analyze_ppt(inp, output):
     prs.save(output)
 
 
+def plot_dot(slide, dot_img, x, y, origin, xpi, ypi, size=0.1):
+    """
+    A very specific function for putting a dot on an image of a line plot
+    in a powerpoint.
+    
+
+    Parameters
+    ----------
+    slide : pptx slide object
+        the slide you're plotting in.
+    dot_img : str
+        path to image you want to place
+    x : float
+        the x value to plot.
+    y : float
+        the y value to plot.
+    origin : tuple of int
+        x,y of the origin of the chart in inches.
+    xpi : float
+        the number of x units per inch.
+    ypi : float
+        the number of y units per inch.
+    size: float
+        size of the inserted dot image
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    # images are placed using the coords of their upper left corner... right?
+    
+    loc_x = x / xpi
+    loc_y = y / ypi
+    
+    im = Image.open(dot_img)
+    width, height = (size,size)
+    
+    x_offset = int(width/2)
+    y_offset = int(height/2)
+    
+    actual_x = loc_x - x_offset
+    actual_y = loc_y - y_offset
+    
+    ox, oy = origin
+    plot_x = ox + actual_x
+    plot_y = oy - actual_y 
+
+    shp = slide.shapes
+    picture = shp.add_picture(im, Inches(plot_x), Inches(y))
+
+
 def add_ppt_image(slide, img, scale=0.3, insert_type='img', poster=None):
     
     shp = slide.shapes

@@ -109,6 +109,29 @@ def nii_image(nii, dimensions, out_name, cmap):
     if cmap != matplotlib.cm.gray:
         #vmin, vmax = [0, round(data.max(),2)]
         vmin, vmax = [0, round(np.nanpercentile(data, 99.5),2)]
+        
+        """
+        round the scaling to nearest 10 for CBF, nearest 0.1 for CVR and CVRMax, and nearest 10 for CVRDelay. 
+        """
+        if vmax > 100:
+            rounder = 1
+            by = 20
+        elif vmax > 50:
+            rounder = 1
+            by = 10
+        elif vmax > 10:
+            rounder = 1
+            by = 5
+        elif vmax > 1:
+            rounder = 2
+            by = 0.5
+        else:
+            rounder = 2
+            by = 0.1
+        
+        vmax = round(vmax, rounder)
+            
+        
     else:
         vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
     
@@ -131,27 +154,9 @@ def nii_image(nii, dimensions, out_name, cmap):
     plt.tight_layout(0.8)
     
     if cmap != matplotlib.cm.gray:
-        """
-        round the scaling to nearest 10 for CBF, nearest 0.1 for CVR and CVRMax, and nearest 10 for CVRDelay. 
-        """
-        if vmax > 100:
-            rounder = 1
-            by = 20
-        elif vmax > 50:
-            rounder = 1
-            by = 10
-        elif vmax > 10:
-            rounder = 1
-            by = 5
-        elif vmax > 1:
-            rounder = 2
-            by = 0.5
-        else:
-            rounder = 2
-            by = 0.1
             
         tks = list(np.arange(0, vmax, by))
-        tks.append(round(vmax,rounder))
+        tks.append(vmax)
         
         if tks[-1] - tks[-2] < 0.25*by:
             del tks[-2] # if the last two ticks are very close together, delete the penultimate tick
