@@ -107,7 +107,8 @@ def nii_image(nii, dimensions, out_name, cmap):
     fig, ax = plt.subplots(d0, d1, figsize=(d1*mult,d0*mult))
     
     if cmap != matplotlib.cm.gray:
-        vmin, vmax = [0, round(data.max(),2)]
+        #vmin, vmax = [0, round(data.max(),2)]
+        vmin, vmax = [0, round(np.nanpercentile(data, 99.5),2)]
     else:
         vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
     
