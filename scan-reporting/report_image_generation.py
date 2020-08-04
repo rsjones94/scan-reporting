@@ -111,8 +111,6 @@ def nii_image(nii, dimensions, out_name, cmap):
     else:
         vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
     
-    plt.subplots_adjust(wspace=0.000, hspace=0.000)
-    
     # print(vmin,vmax)
     
     # print(frames)
@@ -126,15 +124,18 @@ def nii_image(nii, dimensions, out_name, cmap):
         ax_slice[ax_slice < 0] = np.nan
         im = ax[i][j].imshow(ax_slice, interpolation='nearest', cmap=cmap, vmin=vmin, vmax=vmax)
         ax[i][j].axis('off')
-        
-    plt.tight_layout(3.5)
+    
+    
+    matplotlib.rcParams.update({'font.size': 22})
+    plt.tight_layout(0.6)
     
     if cmap != matplotlib.cm.gray:
-        cbar_ax = fig.add_axes([0.975, 0.15, 0.01, 0.7])
-        fig.colorbar(im, cbar_ax)
+        cbar_ax = fig.add_axes([0.1,0.04,0.8,0.015])
+        fig.colorbar(im, cbar_ax, orientation='horizontal')
     else:
         pass
-        
+    
+    plt.subplots_adjust(wspace=0.000, hspace=0.000)
 
     plt.savefig(out_name)
     

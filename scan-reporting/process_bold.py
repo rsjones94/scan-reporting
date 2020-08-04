@@ -31,9 +31,10 @@ import datetime
 import glob
 import shutil
 
+from pptx import Presentation
 import matplotlib
 
-from helpers import get_terminal, str_time_elapsed, any_in_str
+from helpers import get_terminal, str_time_elapsed, any_in_str, replace_in_ppt, analyze_ppt, add_ppt_image, add_ppt_image_ph
 from report_image_generation import par2nii, nii_image
 
 bash_input = sys.argv[1:]
@@ -48,7 +49,7 @@ for opt, arg in options:
         steps = arg
 
 if steps == '0':
-    steps = '12345'
+    steps = '123456'
         
 try:
     assert type(deidentify_name) == str
@@ -79,7 +80,7 @@ if '1' in steps:
     if not has_deid_name:
         has_ans = False
         while not has_ans:
-            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n]')
+            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n] ')
             if ans in ('y','n'):
                 has_ans = True
                 if ans == 'n':
@@ -161,7 +162,19 @@ if '4' in steps:
     print(f'\nMetrics calculation complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
     
 
-
+signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
+                               {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':matplotlib.cm.gray, 'dims':(4,6)},
+                           ('CBF_MNI',):
+                               {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
+                           ('ZSTAT1_MNI_normalized',):
+                               {'basename': 'CVR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
+                           ('ZMAX2STANDARD_normalized',):
+                               {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
+                           ('TMAX2STANDARD',):
+                               {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
+                          }
+reporting_folder = os.path.join(in_folder, 'reporting_images')
+conversion_folder = os.path.join(reporting_folder, 'gathered')
 if '5' in steps:
     ##### step 5 : reporting image generation
     ## FLAIR, CBF, CVR, CVRmax, CVRdelay
@@ -169,26 +182,11 @@ if '5' in steps:
     
     print(f'\nStep 5: generating reporting images')
     
-    reporting_folder = os.path.join(in_folder, 'reporting_images')
-    conversion_folder = os.path.join(reporting_folder, 'gathered')
+
     if os.path.exists(reporting_folder):
         shutil.rmtree(reporting_folder)
     os.mkdir(reporting_folder)
     os.mkdir(conversion_folder)
-    
-    signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
-                                   {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':matplotlib.cm.gray, 'dims':(4,6)},
-                               ('CBF_MNI',):
-                                   {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
-                               ('ZSTAT1_MNI_normalized',):
-                                   {'basename': 'CVR', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
-                               ('ZMAX2STANDARD_normalized',):
-                                   {'basename': 'CVRmax', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
-                               ('TMAX2STANDARD',):
-                                   {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
-                              }
-        
-    
 
     for signature, subdict in signature_relationships.items():
         
@@ -221,5 +219,49 @@ if '5' in steps:
     
     print(f'\nReporting images generated. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
     
+if '6' in steps:
+    ##### step 6: make the powerpoint
+    
+    print(f'\nStep 6: generating powerpoint')
+    
+    template_loc = r'/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/TEMPLATE_BOLD.pptx'
+    template_out = os.path.join(in_folder, f'{pt_id}_report.pptx')
+    
+    shutil.copyfile(template_loc, template_out)
+    
+    replace_in_ppt('PTSTEN_###_##', pt_id, template_out)
+    
+    #markup = os.path.join(in_folder, f'{pt_id}_report_MARKUP.pptx')
+    #analyze_ppt(template_out, markup)
+    
+    """
+    Slide 3: FLAIR
+    Slide 4: CBF
+    Slide 6: CVR
+    Sldie 7: CVRmax
+    Slide 8: CVRdelay
+    Slide 10: CVR video
+    """
+    
+    pres = Presentation(template_out)
+    
+    im_names = [os.path.join(reporting_folder, f"{val['basename']}_report_image.png") for key,val in signature_relationships.items()]
+    slides = [2, 3, 5, 6, 7]
+
+    """
+    movie = os.path.join(in_folder, f'{pt_id}_zstatMovie.mp4')
+    movie_slide = 9
+    add_ppt_image(pres.slides[movie_slide], movie, insert_type='mov', poster=im_names[0])
+    """
+    
+    
+    for slide, name in zip(slides, im_names):
+        #add_ppt_image_ph(pres.slides[slide], 10, name) # don't ask why idx is 10. it for all the placeholders in this template
+        add_ppt_image(pres.slides[slide], name)
+    pres.save(template_out)
+    
+    
+            
+    print(f'\nPowerpoint generated. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
     
 print(f'\nProcessing complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes\n')
