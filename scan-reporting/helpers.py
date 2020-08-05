@@ -84,7 +84,7 @@ def plot_dot(slide, dot_img, x, y, origin, xpi, ypi, size=0.1):
     ypi : float
         the number of y units per inch.
     size: float
-        size of the inserted dot image
+        size of the inserted dot image in inches
 
     Returns
     -------
@@ -92,40 +92,39 @@ def plot_dot(slide, dot_img, x, y, origin, xpi, ypi, size=0.1):
 
     """
     
-    # images are placed using the coords of their upper left corner... right?
-    
-    loc_x = x / xpi
-    loc_y = y / ypi
-    
-    im = Image.open(dot_img)
-    width, height = (size,size)
-    
-    x_offset = int(width/2)
-    y_offset = int(height/2)
-    
-    actual_x = loc_x - x_offset
-    actual_y = loc_y - y_offset
+    # images are placed using the coords of their upper left corner
     
     ox, oy = origin
-    plot_x = ox + actual_x
-    plot_y = oy - actual_y 
+    
+    off_x = x / xpi # raw offset from origin in inches
+    off_y = y / ypi
+    
+    over_x = ox + off_x # absolute position after accounting for origin but not image size
+    over_y = oy - off_y
+    
+    account_x = over_x - (size/2)
+    account_y = over_y - (size/2)
+    
+    plot_x = account_x
+    plot_y = account_y
 
     shp = slide.shapes
-    picture = shp.add_picture(im, Inches(plot_x), Inches(y))
+    #print(f'Plotting {plot_x,plot_y}. Origin: {origin}. xy: {x,y}')
+    picture = shp.add_picture(dot_img, Inches(plot_x), Inches(plot_y), width=Inches(size), height=Inches(size))
 
 
-def add_ppt_image(slide, img, scale=0.3, insert_type='img', poster=None):
-    
+def add_ppt_image(slide, img, scale=0.3, insert_type='img', poster=None, at=(0,0)):
+    ex, why = at
     shp = slide.shapes
     
     if insert_type=='img':
         im = Image.open(img)
         width, height = im.size
-        picture = shp.add_picture(img, 0, 0)
+        picture = shp.add_picture(img, Inches(ex), Inches(why))
         picture.width = int(picture.width*scale)
         picture.height = int(picture.height*scale)
     elif insert_type=='mov':
-        picture = slide.shapes.add_movie(img, 0, 0, 20000, 20000, poster_frame_image=poster, mime_type='video/mp4')
+        picture = slide.shapes.add_movie(img, ex, why, 20000, 20000, poster_frame_image=poster, mime_type='video/mp4')
         
 
 def add_ppt_image_ph(slide, placeholder_id, image_url):

@@ -114,16 +114,16 @@ def nii_image(nii, dimensions, out_name, cmap):
         round the scaling to nearest 10 for CBF, nearest 0.1 for CVR and CVRMax, and nearest 10 for CVRDelay. 
         """
         if vmax > 100:
-            rounder = 1
+            rounder = 0
             by = 20
         elif vmax > 50:
-            rounder = 1
+            rounder = 0
             by = 10
         elif vmax > 10:
-            rounder = 1
+            rounder = 0
             by = 5
         elif vmax > 1:
-            rounder = 2
+            rounder = 1
             by = 0.5
         else:
             rounder = 2
