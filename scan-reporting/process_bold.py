@@ -198,6 +198,17 @@ if '5' in steps:
     
     print(f'\nStep 5: generating reporting images')
     
+    thresh_names = []
+    thresh_vals = []
+    
+    thresh_file = os.path.join(in_folder, 'thresh_vals.csv')
+    
+    has_thresh_file = 0
+    try:
+        thresh_data = pd.read_csv(thresh_file, header=None, index_col=0)
+        has_thresh_file = 1
+    except FileNotFoundError:
+        pass
 
     if os.path.exists(reporting_folder):
         shutil.rmtree(reporting_folder)
@@ -205,6 +216,12 @@ if '5' in steps:
     os.mkdir(conversion_folder)
 
     for signature, subdict in signature_relationships.items():
+        
+        if has_thresh_file:
+            cmax = float(thresh_data.loc[subdict['basename']])
+        else:
+            cmax = None
+            
         
         candidates = []
         # note that the signature matching includes the full path. probably not a great idea
@@ -229,8 +246,13 @@ if '5' in steps:
             shutil.copy(foi, new_name)
             
         im_name = os.path.join(reporting_folder, f'{subdict["basename"]}_report_image.png')
-        nii_image(new_name, subdict['dims'], im_name, cmap=subdict['cmap'])
+        thresh_vals.append(nii_image(new_name, subdict['dims'], im_name, cmap=subdict['cmap'], cmax=cmax))
+        thresh_names.append(subdict["basename"])
             
+    
+    thresh_dict = {key:val for key,val in zip(thresh_names, thresh_vals)}
+    thresh_ser = pd.Series(thresh_dict)
+    thresh_ser.to_csv(thresh_file, header=False)
     
     
     print(f'\nReporting images generated. Elapsed time: {str_time_elapsed(start_stamp)} minutes')

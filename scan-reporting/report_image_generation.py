@@ -45,7 +45,7 @@ def filter_zeroed_axial_slices(nii_data):
     return new
 
 
-def nii_image(nii, dimensions, out_name, cmap):
+def nii_image(nii, dimensions, out_name, cmap, cmax=None):
     """
     Produces a png representing multiple AXIAL slices of a NiFTI
 
@@ -59,10 +59,14 @@ def nii_image(nii, dimensions, out_name, cmap):
         name of the output image.
     cmap : str or matplotlib cmap
         matplotlib color map.
+    cmax : float
+        optional arg for setting colorbar/intensity thresholds. If cmap is
+        grayscale, cmax is used to set the upper percentile threshold. Otherwise,
+        cmax is the maximum value of the colorbar.
 
     Returns
     -------
-    None.
+    The thresholding value (upper percentile for grayscale, absolute value for all other cmaps).
 
     """
     
@@ -107,8 +111,10 @@ def nii_image(nii, dimensions, out_name, cmap):
     fig, ax = plt.subplots(d0, d1, figsize=(d1*mult,d0*mult))
     
     if cmap != matplotlib.cm.gray:
-        #vmin, vmax = [0, round(data.max(),2)]
-        vmin, vmax = [0, round(np.nanpercentile(data, 99.5),2)]
+        if cmax is not None:    
+            vmin, vmax = [0, cmax]
+        else:
+            vmin, vmax = [0, round(np.nanpercentile(data, 99.5),2)]
         
         """
         round the scaling to nearest 10 for CBF, nearest 0.1 for CVR and CVRMax, and nearest 10 for CVRDelay. 
@@ -130,10 +136,16 @@ def nii_image(nii, dimensions, out_name, cmap):
             by = 0.1
         
         vmax = round(vmax, rounder)
+        ret_max = vmax
             
         
     else:
-        vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
+        if cmax is not None:
+            vmin, vmax = [0, round(np.nanpercentile(data, cmax),2)]
+            ret_max = cmax
+        else:
+            vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
+            ret_max = 97
     
     # print(vmin,vmax)
     
@@ -171,5 +183,7 @@ def nii_image(nii, dimensions, out_name, cmap):
     plt.savefig(out_name)
     
     plt.rcParams.update(plt.rcParamsDefault)
+    
+    return ret_max
     
     
