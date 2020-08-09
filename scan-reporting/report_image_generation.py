@@ -31,21 +31,33 @@ def par2nii(dcm, out_folder):
     return os.path.join(out_folder, f'{original_stem}.nii.gz') # this is the name of the output
 
 
-def filter_zeroed_axial_slices(nii_data):
-    # removes slices if they are all 0 or contain any NaN
+def filter_zeroed_axial_slices(nii_data, thresh=0.90):
+    # removes slices if the number of pixels that are lesser than or equal to 0 exceeds a % threshold, and replaces NaN with -1
+    the_data = nii_data.copy()
+    wherenan = np.isnan(the_data)
+    the_data[wherenan] = -1
+    
     keep = []
-    for i in range(nii_data.shape[2]):
-        d = nii_data[:,:,i]
-        if not ((np.isclose(d,0)).all() or (d <= 0).all()) and not (np.isnan(d).any()):
+    for i in range(the_data.shape[2]):
+        d = the_data[:,:,i]
+        
+        near_zero = np.isclose(d,0)
+        less_zero = (d <= 0)
+        
+        bad_pixels = np.logical_or(near_zero, less_zero)
+        
+        perc_bad = bad_pixels.sum() / d.size
+        
+        if not perc_bad >= thresh:
             keep.append(True)
         else:
             keep.append(False)
     
-    new = nii_data[:,:,keep]
+    new = the_data[:,:,keep]
     return new
 
 
-def nii_image(nii, dimensions, out_name, cmap, cmax=None):
+def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
     """
     Produces a png representing multiple AXIAL slices of a NiFTI
 
@@ -180,7 +192,10 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None):
     
     plt.subplots_adjust(wspace=0.000, hspace=0.000)
 
-    plt.savefig(out_name)
+    if save:
+        plt.savefig(out_name)
+    else:
+        plt.show()
     
     plt.rcParams.update(plt.rcParamsDefault)
     
