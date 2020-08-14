@@ -31,7 +31,7 @@ def par2nii(dcm, out_folder):
     return os.path.join(out_folder, f'{original_stem}.nii.gz') # this is the name of the output
 
 
-def filter_zeroed_axial_slices(nii_data, thresh=0.90):
+def filter_zeroed_axial_slices(nii_data, thresh=0.99):
     # removes slices if the number of pixels that are lesser than or equal to 0 exceeds a % threshold, and replaces NaN with -1
     the_data = nii_data.copy()
     wherenan = np.isnan(the_data)
@@ -100,7 +100,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         if num_subs <= (num_slices+1):
             appropriate = True
         else:
-            print(f'Notice: not enough slices to fill plot. Reducing plot dimensions for {out_name}')
+            print(f'\n!!!!!\n\nNotice: not enough slices to fill plot. Reducing plot dimensions for {out_name}\n\n!!!!!\n')
             if d1 >= d0:
                 d1 -= 1
             else:
