@@ -156,8 +156,8 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
             vmin, vmax = [0, round(np.nanpercentile(data, cmax),2)]
             ret_max = cmax
         else:
-            vmin, vmax = [0, round(np.nanpercentile(data, 97),2)]
-            ret_max = 97
+            vmin, vmax = [0, round(np.nanpercentile(data, 97.5),2)]
+            ret_max = 97.5
     
     # print(vmin,vmax)
     
@@ -170,6 +170,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         ax_slice = ndimage.rotate(data[:,:,f].T, 180)
         ax_slice[np.isclose(ax_slice,0)] = np.nan
         ax_slice[ax_slice < 0] = np.nan
+        ax_slice = np.fliplr(ax_slice) # convert to radiological orientation
         im = ax[i][j].imshow(ax_slice, interpolation='nearest', cmap=cmap, vmin=vmin, vmax=vmax)
         ax[i][j].axis('off')
     
@@ -182,7 +183,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         tks = list(np.arange(0, vmax, by))
         tks.append(vmax)
         
-        if tks[-1] - tks[-2] < 0.25*by:
+        if tks[-1] - tks[-2] < 0.35*by:
             del tks[-2] # if the last two ticks are very close together, delete the penultimate tick
         
         cbar_ax = fig.add_axes([0.1,0.055,0.8,0.015])

@@ -96,7 +96,7 @@ if '1' in steps:
     if not has_deid_name:
         has_ans = False
         while not has_ans:
-            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n] ')
+            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n]\n')
             if ans in ('y','n'):
                 has_ans = True
                 if ans == 'n':
@@ -127,9 +127,30 @@ if '2' in steps:
     asltype = 'Baseline'
     dynamics = 360
     
+
+    has_ans = False
+    while not has_ans:
+        ans = input('What is the ASL type? [PASL / pCASL]\n')
+        if ans in ('pCASL', 'PASL'):
+            has_ans = True
+            confirm = input(f'Please confirm that ASL type is {ans} by entering the ASL type again\n')
+            if ans != confirm:
+                has_ans = False
+                print(f'\nConfirmation failed ({ans} != {confirm})\n')
+            else:
+                print('\nEntry confirmed\n')
+        else:
+            print('Answer must be PASL or pCASL')
+            
+    if ans == 'pCASL':
+        pcaslBool = 1
+    elif ans == 'PASL':
+        pcaslBool = 0
+    
+    
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/BOLD/Scripts/'
     os.chdir(processing_scripts_loc)
-    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nojvm -nodesktop -nosplash -r "Master('{pt_id}','{asltype}',{dynamics})"'''
+    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nojvm -nodesktop -nosplash -r "Master('{pt_id}','{asltype}',{dynamics},{pcaslBool})"'''
     
     # print(processing_input)
     
@@ -189,6 +210,7 @@ signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
                            ('TMAX2STANDARD',):
                                {'basename': 'CVRdelay', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                           }
+    
 reporting_folder = os.path.join(in_folder, 'reporting_images')
 conversion_folder = os.path.join(reporting_folder, 'gathered')
 if '5' in steps:
