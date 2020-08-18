@@ -37,24 +37,27 @@ def filter_zeroed_axial_slices(nii_data, thresh=0.99):
     wherenan = np.isnan(the_data)
     the_data[wherenan] = -1
     
-    keep = []
-    for i in range(the_data.shape[2]):
-        d = the_data[:,:,i]
+    if thresh:
+        keep = []
+        for i in range(the_data.shape[2]):
+            d = the_data[:,:,i]
+            
+            near_zero = np.isclose(d,0)
+            less_zero = (d <= 0)
+            
+            bad_pixels = np.logical_or(near_zero, less_zero)
+            
+            perc_bad = bad_pixels.sum() / d.size
+            
+            if not perc_bad >= thresh:
+                keep.append(True)
+            else:
+                keep.append(False)
         
-        near_zero = np.isclose(d,0)
-        less_zero = (d <= 0)
-        
-        bad_pixels = np.logical_or(near_zero, less_zero)
-        
-        perc_bad = bad_pixels.sum() / d.size
-        
-        if not perc_bad >= thresh:
-            keep.append(True)
-        else:
-            keep.append(False)
-    
-    new = the_data[:,:,keep]
-    return new
+        new = the_data[:,:,keep]
+        return new
+    else:
+        return the_data
 
 
 def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
@@ -86,7 +89,8 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
     
     img = nib.load(nii)
     data = img.get_fdata()
-    data = filter_zeroed_axial_slices(data)
+    #data = filter_zeroed_axial_slices(data)
+    data = filter_zeroed_axial_slices(data, thresh=False)
     
     num_slices = data.shape[2] - 1 # num of axial slices
     
@@ -114,7 +118,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
     frames = [int(0 + step * i) for i in range(num_subs)]
     """
     if cmap != matplotlib.cm.gray:
-        frames = np.arange(11,41,1)
+        frames = np.arange(10,40,1)
     else:
         frames = np.arange(0,25,1)
     

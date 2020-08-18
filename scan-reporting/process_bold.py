@@ -325,22 +325,25 @@ if '6' in steps:
     
     
     # make the etco2 trace
-    etco2_file = os.path.join(in_folder, 'etco2.csv')
-    etco2_fig = os.path.join(reporting_folder, 'etco2.png')
-    
-    etco2_data = pd.read_csv(etco2_file)
-    dynamics = etco2_data.iloc[:, 0]
-    co2 = etco2_data.iloc[:, 1]
-    
-    plt.figure(figsize=((12,8)))
-    plt.plot(dynamics, co2, lw=1)
-    plt.scatter(dynamics, co2, color='black')
-    plt.ylabel('EtCO2 (mmHg)')
-    plt.xlabel('Dynamic Scan')
-    plt.tight_layout()
-    plt.savefig(etco2_fig)
-    plt.close()
-    
+    try:
+        etco2_file = os.path.join(in_folder, 'etco2.csv')
+        etco2_fig = os.path.join(reporting_folder, 'etco2.png')
+        
+        etco2_data = pd.read_csv(etco2_file)
+        dynamics = etco2_data.iloc[:, 0]
+        co2 = etco2_data.iloc[:, 1]
+        
+        plt.figure(figsize=((12,8)))
+        plt.plot(dynamics, co2, lw=1)
+        plt.scatter(dynamics, co2, color='black')
+        plt.ylabel('EtCO2 (mmHg)')
+        plt.xlabel('Dynamic Scan')
+        plt.tight_layout()
+        plt.savefig(etco2_fig)
+        plt.close()
+    except FileNotFoundError:
+        print(f'EtCO2 trace not found. The graph will not be generated and added to report.')
+        
     
     template_loc = r'/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/TEMPLATE_BOLD_PLACEHOLDERS.pptx'
     template_out = os.path.join(in_folder, f'{pt_id}_report.pptx')
@@ -392,7 +395,10 @@ if '6' in steps:
     
     for slide, name in zip(slides, im_names):
         #add_ppt_image_ph(pres.slides[slide], 10, name) # don't ask why idx is 10. it for all the placeholders in this template
-        add_ppt_image(pres.slides[slide], name)
+        try:
+            add_ppt_image(pres.slides[slide], name)
+        except FileNotFoundError:
+            print(f'\n!!!!!\nWARNING: image {name} not found and could not be added to report\n!!!!!\n')
     
     # metrics are written as CSVs in the PSTEN_ID folder called TMAX_metrics and CBF_metrics
     # the values within are ordered as lACA, rACA, lMCA, rMCA, lPCA, rPCA
