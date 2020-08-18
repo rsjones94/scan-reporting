@@ -92,6 +92,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
     
     d0, d1 = dimensions
     
+    """
     appropriate = False
     
     while not appropriate:
@@ -111,6 +112,13 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         
     step = (num_slices - 0) / (num_subs - 1)
     frames = [int(0 + step * i) for i in range(num_subs)]
+    """
+    if cmap != matplotlib.cm.gray:
+        frames = np.arange(11,41,1)
+    else:
+        frames = np.arange(0,25,1)
+    
+    
     
     d0_l = [i for i in range(d0)]
     d1_l = [i for i in range(d1)]
