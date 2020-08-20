@@ -17,6 +17,9 @@ input:
         in the string will be carried out. For example, 2 will cause the script
         to only go through step 2. Because there are only steps, multistep specification isn't really needed,
             but you can explicitly specify steps 1 and 2 by passing -s 12
+    -h / --hct : the hematocrit as a float between 0 and 1. Required for step 2
+    -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0)
+    -p / --pttype : the type of patient. 0 for SCA, 1 for control. Required for step 2
 """
 
 import os
@@ -25,21 +28,14 @@ import getopt
 import subprocess
 import time
 import datetime
-import glob
-import shutil
-import datetime
 
-from pptx import Presentation
-import matplotlib
-import matplotlib.pyplot as plt
-import pandas as pd
-import nibabel as nib
-
-from helpers import get_terminal, str_time_elapsed, any_in_str, replace_in_ppt, analyze_ppt, add_ppt_image, add_ppt_image_ph, plot_dot
-from report_image_generation import par2nii, nii_image
+from helpers import get_terminal, str_time_elapsed
 
 bash_input = sys.argv[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:d:", ["infolder=","name=",'steps=','dob='])
+options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:", ["infolder=","name=",'steps=','hct=', 'flip=', 'pttype='])
+
+
+flip = 0
 
 for opt, arg in options:
     if opt in ('-i', '--infile'):
@@ -48,6 +44,12 @@ for opt, arg in options:
         deidentify_name = arg
     elif opt in ('-s', '--steps'):
         steps = arg
+    elif opt in ('-h', '--hct'):
+        hematocrit = float(arg)
+    elif opt in ('-f', '--flip'):
+        flip = int(arg)
+    elif opt in ('-p', '--pttype'):
+        pt_type = int(arg)
 
 try:
     if steps == '0':
@@ -96,7 +98,7 @@ if '1' in steps:
     print(f'\nStep 1: deidentification. {deidentify_name} will be replaced with {replacement}')
         
     # build the call to the deidentify script
-    deid_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/BOLD/Scripts/deidentifySLW'
+    deid_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/deidentifySLW/deidentifyFileNames.sh'
     
     strip_filename_input = f'deidentifyFileNames.sh {in_folder} {deidentify_name} {replacement}'
     strip_header_input = f'deidentifyPARfiles.sh {in_folder}'
@@ -113,33 +115,10 @@ if '2' in steps:
     
     print(f'Step 2: begin main processing sequence\n')
     
-    asltype = 'Baseline'
-    dynamics = 360
     
-
-    has_ans = False
-    while not has_ans:
-        ans = input('What is the ASL type? [PASL / pCASL]\n')
-        if ans in ('pCASL', 'PASL'):
-            has_ans = True
-            confirm = input(f'Please confirm that ASL type is {ans} by entering the ASL type again\n')
-            if ans != confirm:
-                has_ans = False
-                print(f'\nConfirmation failed ({ans} != {confirm})\n')
-            else:
-                print('\nEntry confirmed\n')
-        else:
-            print('Answer must be PASL or pCASL')
-            
-    if ans == 'pCASL':
-        pcaslBool = 1
-    elif ans == 'PASL':
-        pcaslBool = 0
-    
-    
-    processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/BOLD/Scripts/'
+    processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
     os.chdir(processing_scripts_loc)
-    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nojvm -nodesktop -nosplash -r "Master('{pt_id}','{asltype}',{dynamics},{pcaslBool})"'''
+    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type},{flip})"'''
     
     # print(processing_input)
     
