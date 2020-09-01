@@ -98,7 +98,7 @@ if '1' in steps:
     print(f'\nStep 1: deidentification. {deidentify_name} will be replaced with {replacement}')
         
     # build the call to the deidentify script
-    deid_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/deidentifySLW/deidentifyFileNames.sh'
+    deid_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/deidentifySLW/'
     
     strip_filename_input = f'deidentifyFileNames.sh {in_folder} {deidentify_name} {replacement}'
     strip_header_input = f'deidentifyPARfiles.sh {in_folder}'
