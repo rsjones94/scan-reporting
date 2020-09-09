@@ -47,7 +47,8 @@ import nibabel as nib
 from helpers import get_terminal, str_time_elapsed, any_in_str, replace_in_ppt, analyze_ppt, add_ppt_image, add_ppt_image_ph, plot_dot
 from report_image_generation import par2nii, nii_image
 
-bash_input = sys.argv[1:]
+inp = sys.argv
+bash_input = inp[1:]
 options, remainder = getopt.getopt(bash_input, "i:n:s:d:", ["infolder=","name=",'steps=','dob='])
 
 for opt, arg in options:
@@ -71,6 +72,12 @@ try:
     assert os.path.isdir(in_folder)
 except AssertionError:
     raise AssertionError('input folder does not exist')
+    
+thecommand = ' '.join(inp)
+meta_file_name = os.path.join(in_folder, 'meta.txt')
+meta_file = open(meta_file_name, 'w')
+meta_file.write(thecommand)
+meta_file.close()
 
 
 start_stamp = time.time()

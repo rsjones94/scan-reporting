@@ -33,8 +33,10 @@ import glob
 
 from helpers import get_terminal, str_time_elapsed
 
-bash_input = sys.argv[1:]
+inp = sys.argv
+bash_input = inp[1:]
 options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:", ["infolder=","name=",'steps=','hct=', 'flip=', 'pttype='])
+
 
 
 flip = 0
@@ -75,6 +77,14 @@ try:
     assert os.path.isdir(in_folder)
 except AssertionError:
     raise AssertionError('input folder does not exist')
+    
+
+thecommand = ' '.join(inp)
+meta_file_name = os.path.join(in_folder, 'meta.txt')
+meta_file = open(meta_file_name, 'w')
+meta_file.write(thecommand)
+meta_file.close()
+
 
 
 start_stamp = time.time()
