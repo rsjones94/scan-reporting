@@ -19,7 +19,8 @@ input:
             but you can explicitly specify steps 1 and 2 by passing -s 12
     -h / --hct : the hematocrit as a float between 0 and 1. Required for step 2
     -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0)
-    -p / --pttype : the type of patient. 0 for SCA, 1 for control. Required for step 2
+    -p / --pttype : the type of patient. 'sca' or 'control'. Required for step 2
+    -a / --asltr : the asl_tr for the patient. this is generally 4, but can be found in the PAR file for the ASL source image
 """
 
 import os
@@ -28,6 +29,7 @@ import getopt
 import subprocess
 import time
 import datetime
+import glob
 
 from helpers import get_terminal, str_time_elapsed
 
@@ -36,6 +38,7 @@ options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:", ["infolder=","nam
 
 
 flip = 0
+asl_tr = 4
 
 for opt, arg in options:
     if opt in ('-i', '--infile'):
@@ -46,10 +49,20 @@ for opt, arg in options:
         steps = arg
     elif opt in ('-h', '--hct'):
         hematocrit = float(arg)
+        if hematocrit > 1 or hematocrit < 0:
+            raise Exception('Hematocrit must be between 0 and 1')
     elif opt in ('-f', '--flip'):
         flip = int(arg)
     elif opt in ('-p', '--pttype'):
-        pt_type = int(arg)
+        pt_type = arg
+        if pt_type == 'control':
+            pt_type_num = 0
+        elif pt_type == 'sca':
+            pt_type_num = 1
+        else:
+            raise Exception('Patient type must be "sca" or "control"')
+    elif opt in ('-a', '--asl_tr'):
+        asl_tr = float(arg)
 
 try:
     if steps == '0':
@@ -115,10 +128,54 @@ if '2' in steps:
     
     print(f'Step 2: begin main processing sequence\n')
     
+    acquired_folder = os.path.join(in_folder, 'Acquired')
+    
+    
+    globber_pld = os.path.join(acquired_folder,'*PLD*.PAR')
+    globber_ld = os.path.join(acquired_folder,'*LD*.PAR')
+    
+    names_with_pld = glob.glob(globber_pld)
+    names_with_ld = glob.glob(globber_ld)
+    
+    pld_name = names_with_pld[0]
+    ld_name = names_with_ld[0]
+    
+    pld_split = pld_name.split('_')
+    ld_split = ld_name.split('_')
+    
+    plds = [i for i in pld_split if 'PLD' in i]
+    lds = [i for i in ld_split if ('LD' in i and 'PLD' not in i)]
+    
+    pld = plds[0][3:]
+    ld = lds[0][2:]
+    
+    has_ans = False
+    while not has_ans:
+        ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nIs this okay? (y/n/show)\n')
+        if ans == 'y':
+            has_ans = True
+            asl_pld = pld
+            asl_ld = ld
+        elif ans == 'n':
+            asl_pld = input('What should asl_pld be?\n')
+            asl_ld = input('What should asl_ld be?\n')
+            
+            try:
+                asl_pld = int(asl_pld)
+                asl_ld = int(asl_ld)
+                has_ans = True
+            except ValueError:
+                print('ERROR: you must enter integer values for both asl_pld and asl_ld')
+        elif ans == 'show':
+            print(f'File with PLD: {pld_name}')
+            print(f'File with LD: {ld_name}')
+        else:
+            print('Answer must be y, n or show')
+    
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
     os.chdir(processing_scripts_loc)
-    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type},{flip})"'''
+    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type_num},{flip},{asl_tr},{asl_pld},{asl_ld})"'''
     
     # print(processing_input)
     
