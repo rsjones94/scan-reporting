@@ -73,16 +73,20 @@ try:
 except AssertionError:
     raise AssertionError('input folder does not exist')
     
-thecommand = ' '.join(inp)
-meta_file_name = os.path.join(in_folder, 'meta.txt')
-meta_file = open(meta_file_name, 'w')
-meta_file.write(thecommand)
-meta_file.close()
+
 
 
 start_stamp = time.time()
 now = datetime.datetime.now()
 pretty_now = now.strftime("%Y-%m-%d %H:%M:%S")
+
+thecommand = ' '.join(inp)
+meta_file_name = os.path.join(in_folder, 'meta.txt')
+meta_file = open(meta_file_name, 'w')
+meta_file.write(f'Processing started {pretty_now}')
+meta_file.write('\n\n')
+meta_file.write(thecommand)
+meta_file.close()
 
 print(f'\nBegin processing: {pretty_now}')
 
