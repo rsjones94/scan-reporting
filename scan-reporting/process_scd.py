@@ -155,43 +155,65 @@ if '2' in steps:
     names_with_pld = glob.glob(globber_pld)
     names_with_ld = glob.glob(globber_ld)
     
-    pld_name = names_with_pld[0]
-    ld_name = names_with_ld[0]
-    
-    if pld_name != ld_name:
-        raise Exception(f'\n{pld_name} != {ld_name}\nPLD and LD parameters not found in same file. Please configure filenames so PLD and LD are specified in the pCASL source file')
+
+    if len(names_with_pld) == 0 or len(names_with_ld) == 0:
+        print('No PLD/LD signature detected, implying a lack of ASL data. If you intend to run ASL processing this will be an issue.')
+
+        has_ans = False
+        while not has_ans:
+            ans = input(f'\nWould you like to proceed anyway? [y/n]\n')
+            if ans in ('y','n'):
+                has_ans = True
+                if ans == 'n':
+                    raise Exception('Aborting processing')
+                else:
+                    print('Continuing. TR, PLD and PL will be set to 0 but can be manually adjusted.')
+            else:
+                print('Answer must be "y" or "n"')
+                
+        pld_name = 'NOT FOUND'
+        candidate_line = 'NOT FOUND'
+        tr = pld = ld = 0
         
-    pcasl_meta = open(pld_name)
-    pcasl_lines = pcasl_meta.read().split('\n')
-    candidate_lines = [i for i in pcasl_lines if 'Repetition time' in i]
-    candidate_line = candidate_lines[0]
-    candidate_broken = candidate_line.split(' ')
-    
-    asl_tr = None
-    for c in candidate_broken:
-        try:
-            asl_tr = float(c) / 1000 # value is given in ms, need s
-            break
-        except ValueError:
-            pass
-    
-    pld_split = pld_name.split('_')
-    ld_split = ld_name.split('_')
-    
-    
-    plds = [i for i in pld_split if 'PLD' in i]
-    lds = [i for i in ld_split if ('LD' in i and 'PLD' not in i)]
-    
-    pld = plds[0][3:]
-    ld = lds[0][2:]
-    
+    else:
+        pld_name = names_with_pld[0]
+        ld_name = names_with_ld[0]
+        
+        if pld_name != ld_name:
+            raise Exception(f'\n{pld_name} != {ld_name}\nPLD and LD parameters not found in same file. Please configure filenames so PLD and LD are specified in the pCASL source file')
+            
+        pcasl_meta = open(pld_name)
+        pcasl_lines = pcasl_meta.read().split('\n')
+        candidate_lines = [i for i in pcasl_lines if 'Repetition time' in i]
+        candidate_line = candidate_lines[0]
+        candidate_broken = candidate_line.split(' ')
+        
+        tr = None
+        for c in candidate_broken:
+            try:
+                tr = float(c) / 1000 # value is given in ms, need s
+                break
+            except ValueError:
+                pass
+        
+        pld_split = pld_name.split('_')
+        ld_split = ld_name.split('_')
+        
+        
+        plds = [i for i in pld_split if 'PLD' in i]
+        lds = [i for i in ld_split if ('LD' in i and 'PLD' not in i)]
+        
+        pld = plds[0][3:]
+        ld = lds[0][2:]
+        
     has_ans = False
     while not has_ans:
-        ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {asl_tr}\nIs this okay? (y/n/show)\n')
+        ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {tr}\nIs this okay? (y/n/show)\n')
         if ans == 'y':
             has_ans = True
             asl_pld = pld
             asl_ld = ld
+            asl_tr = tr
         elif ans == 'n':
             asl_pld_hold = input('What should asl_pld be?\n')
             asl_ld_hold = input('What should asl_ld be?\n')
@@ -211,8 +233,8 @@ if '2' in steps:
             print('Answer must be y, n or show')
             
     
-    if asl_tr is None:
-        raise Exception('TR cannot be None.')
+    if None in [asl_tr, asl_pld, asl_ld]:
+        raise Exception('TR, PLD and LD all must be defined (cannot be None)')
     
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
