@@ -91,7 +91,12 @@ start_stamp = time.time()
 now = datetime.datetime.now()
 pretty_now = now.strftime("%Y-%m-%d %H:%M:%S")
 
-thecommand = ' '.join(inp)
+inp_copy = inp.copy()
+for i, s in enumerate(inp_copy):
+    if s == '-n' or s== '--name':
+        inp_copy[i+1] = '[REDACTED]'
+
+thecommand = ' '.join(inp_copy)
 meta_file_name = os.path.join(in_folder, 'meta.txt')
 meta_file = open(meta_file_name, 'w')
 meta_file.write(f'Processing started {pretty_now}')
