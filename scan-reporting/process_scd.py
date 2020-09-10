@@ -20,7 +20,6 @@ input:
     -h / --hct : the hematocrit as a float between 0 and 1. Required for step 2
     -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0)
     -p / --pttype : the type of patient. 'sca' or 'control'. Required for step 2
-    -a / --asltr : the asl_tr for the patient. this is generally 4, but can be found in the PAR file for the ASL source image
 """
 
 import os
@@ -31,16 +30,22 @@ import time
 import datetime
 import glob
 
+
 from helpers import get_terminal, str_time_elapsed
 
 inp = sys.argv
 bash_input = inp[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:", ["infolder=","name=",'steps=','hct=', 'flip=', 'pttype='])
+options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:", ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl='])
 
 
 
 flip = 0
 asl_tr = 4
+
+do_run = {'trust':1,
+          'vol':1,
+          'asl':1
+          }
 
 for opt, arg in options:
     if opt in ('-i', '--infile'):
@@ -63,8 +68,12 @@ for opt, arg in options:
             pt_type_num = 1
         else:
             raise Exception('Patient type must be "sca" or "control"')
-    elif opt in ('-a', '--asl_tr'):
-        asl_tr = float(arg)
+    elif opt in ('-e', '--excl'):
+        parsed_excl = arg.split(',')
+        for p in parsed_excl:
+            if p not in do_run:
+                raise ValueError('Input for -e/--excl must contain only the processes to exclude (trust, vol or asl) separated by a comma with no spaces\ne.g., vol,trust')
+            do_run[p] = 0
 
 try:
     if steps == '0':
@@ -77,8 +86,6 @@ try:
     assert os.path.isdir(in_folder)
 except AssertionError:
     raise AssertionError('input folder does not exist')
-
-
 
 start_stamp = time.time()
 now = datetime.datetime.now()
@@ -151,8 +158,26 @@ if '2' in steps:
     pld_name = names_with_pld[0]
     ld_name = names_with_ld[0]
     
+    if pld_name != ld_name:
+        raise Exception(f'\n{pld_name} != {ld_name}\nPLD and LD parameters not found in same file. Please configure filenames so PLD and LD are specified in the pCASL source file')
+        
+    pcasl_meta = open(pld_name)
+    pcasl_lines = pcasl_meta.read().split('\n')
+    candidate_lines = [i for i in pcasl_lines if 'Repetition time' in i]
+    candidate_line = candidate_lines[0]
+    candidate_broken = candidate_line.split(' ')
+    
+    asl_tr = None
+    for c in candidate_broken:
+        try:
+            asl_tr = float(c) / 1000 # value is given in ms, need s
+            break
+        except ValueError:
+            pass
+    
     pld_split = pld_name.split('_')
     ld_split = ld_name.split('_')
+    
     
     plds = [i for i in pld_split if 'PLD' in i]
     lds = [i for i in ld_split if ('LD' in i and 'PLD' not in i)]
@@ -162,33 +187,39 @@ if '2' in steps:
     
     has_ans = False
     while not has_ans:
-        ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nIs this okay? (y/n/show)\n')
+        ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {asl_tr}\nIs this okay? (y/n/show)\n')
         if ans == 'y':
             has_ans = True
             asl_pld = pld
             asl_ld = ld
         elif ans == 'n':
-            asl_pld = input('What should asl_pld be?\n')
-            asl_ld = input('What should asl_ld be?\n')
+            asl_pld_hold = input('What should asl_pld be?\n')
+            asl_ld_hold = input('What should asl_ld be?\n')
+            asl_tr_hold = input('What should asl_tr be (in seconds)?\n')
             
             try:
-                asl_pld = int(asl_pld)
-                asl_ld = int(asl_ld)
+                asl_pld = int(asl_pld_hold)
+                asl_ld = int(asl_ld_hold)
+                asl_tr = float(asl_tr_hold)
                 has_ans = True
             except ValueError:
-                print('ERROR: you must enter integer values for both asl_pld and asl_ld')
+                print('ERROR: you must enter integer values for both asl_pld and asl_ld, and an int or float for asl_tr')
         elif ans == 'show':
-            print(f'File with PLD: {pld_name}')
-            print(f'File with LD: {ld_name}')
+            print(f'\nFile with PLD/LD specification: {pld_name}')
+            print(f'TR line: {candidate_line}')
         else:
             print('Answer must be y, n or show')
+            
+    
+    if asl_tr is None:
+        raise Exception('TR cannot be None.')
     
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
     os.chdir(processing_scripts_loc)
-    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type_num},{flip},{asl_tr},{asl_pld},{asl_ld})"'''
+    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type_num},{flip},{asl_tr},{asl_pld},{asl_ld},{do_run['trust']},{do_run['vol']},{do_run['asl']})"'''
     
-    # print(processing_input)
+    print(f'Call to MATLAB: {processing_input}')
     
     subprocess.run(processing_input, check=True, shell=True)
     # subprocess.run('quit force', check=True, shell=True)
