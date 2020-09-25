@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # -*- coding: utf-8 -*-
-"""
+help_info = """
 This script takes raw scan data for BOLD scans and processes it completely.
 This involves:
     1) deidentifying the scans
@@ -9,7 +9,13 @@ This involves:
     3) generating the CVR movie
     4) metrics calculation
     5) reporting image generation
-    6) creating patient scan report as a powerpoint (not yet implemented)
+    6) creating patient scan report as a powerpoint
+    
+Note that to have the EtCO2 trace generated for you (step 6), you should add
+a CSV with two columns in the PTSTEN folder (not the Acquired subdirectory)
+called ‘etco2.csv’. Each column should have a header (though the header name
+does not matter). The first column should be the dynamic scan numbers,
+and the second column should be the EtCO2 values.
     
     
 input:
@@ -26,6 +32,7 @@ input:
         scan date in PAR files and DOB). If -d is an age, only the age and metric
         plotting is completed. If -d is not supplied, then neither the dob or age is completed,
         and plotting is carried out using age=0.
+    -g / --help : brings up this helpful information. does not take an argument
 """
 
 import os
@@ -49,7 +56,7 @@ from report_image_generation import par2nii, nii_image
 
 inp = sys.argv
 bash_input = inp[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:d:", ["infolder=","name=",'steps=','dob='])
+options, remainder = getopt.getopt(bash_input, "i:n:s:d:g", ["infolder=","name=",'steps=','dob=', 'help'])
 
 for opt, arg in options:
     if opt in ('-i', '--infile'):
@@ -60,6 +67,9 @@ for opt, arg in options:
         steps = arg
     elif opt in ('-d', '--dob'):
         dobage = arg
+    elif opt in ('-g', '--help'):
+        print(help_info)
+        sys.exit()
 
 try:
     if steps == '0':

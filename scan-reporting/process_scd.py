@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # -*- coding: utf-8 -*-
-"""
+help_info = """
 This script takes raw scan data for SCD scans and processes it completely.
 This involves:
     1) deidentifying the scans
@@ -10,7 +10,7 @@ This involves:
     
 input:
     -i / --infolder : the path to the folder of pt data. of form /Users/manusdonahue/Desktop/Projects/SCD/Data/[PTSTEN_ID]
-        this folder should have one subfolder, acquired, which contains the raw scans
+        this folder should have one subfolder called Acquired which contains the raw scans
     -n / --name : the name of the patient to deidentify. Only required if running step 1
     -s / --steps : the steps to actually calculate, passed as a string of numbers
         if 0, all steps will be carried out. Otherwise, only the steps that appear
@@ -18,8 +18,11 @@ input:
         to only go through step 2. Because there are only steps, multistep specification isn't really needed,
             but you can explicitly specify steps 1 and 2 by passing -s 12
     -h / --hct : the hematocrit as a float between 0 and 1. Required for step 2
-    -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0)
+    -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0).
+        Note that the program will attempt to automatically invert the TRUST
+        if needed, so only pass 1 if the results are still wrong
     -p / --pttype : the type of patient. 'sca' or 'control'. Required for step 2
+    -g / --help : brings up this helpful information. does not take an argument
 """
 
 import os
@@ -35,7 +38,7 @@ from helpers import get_terminal, str_time_elapsed
 
 inp = sys.argv
 bash_input = inp[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:", ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl='])
+options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:g", ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl=', 'help'])
 
 
 
@@ -74,6 +77,9 @@ for opt, arg in options:
             if p not in do_run:
                 raise ValueError('Input for -e/--excl must contain only the processes to exclude (trust, vol or asl) separated by a comma with no spaces\ne.g., vol,trust')
             do_run[p] = 0
+    elif opt in ('-g', '--help'):
+        print(help_info)
+        sys.exit()
 
 try:
     if steps == '0':
