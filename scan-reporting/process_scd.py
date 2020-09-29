@@ -22,6 +22,9 @@ input:
         Note that the program will attempt to automatically invert the TRUST
         if needed, so only pass 1 if the results are still wrong
     -p / --pttype : the type of patient. 'sca' or 'control'. Required for step 2
+    -e / --exclude: subprocessing steps to exclude. The subprocessing steps are
+    TRUST (trust), volumetrics (vol) and ASL (asl). To exclude a step, or steps,
+    enter the steps to exclude separated by a comma, e.g., -e vol,trust
     -g / --help : brings up this helpful information. does not take an argument
 """
 

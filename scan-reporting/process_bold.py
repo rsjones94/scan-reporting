@@ -20,7 +20,7 @@ and the second column should be the EtCO2 values.
     
 input:
     -i / --infolder : the path to the folder of pt data. of form /Users/manusdonahue/Desktop/Projects/BOLD/Data/[PTSTEN_ID]
-        this folder should have one subfolder, acquired, which contains the raw scans
+        this folder should have one subfolder, Acquired, which contains the raw scans
     -n / --name : the name of the patient to deidentify. Only required if running step 1
     -s / --steps : the steps to actually calculate, passed as a string of numbers
         if 0, all steps will be carried out. Otherwise, only the steps that appear
