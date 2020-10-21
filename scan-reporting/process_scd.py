@@ -36,8 +36,42 @@ import time
 import datetime
 import glob
 
-
 from helpers import get_terminal, str_time_elapsed
+
+wizard = """                
+                  ....
+                                .'' .'''
+.                             .'   :
+\\                          .:    :
+ \\                        _:    :       ..----.._
+  \\                    .:::.....:::.. .'         ''.
+   \\                 .'  #-. .-######'     #        '.
+    \\                 '.##'/ ' ################       :
+     \\                  #####################         :
+      \\               ..##.-.#### .''''###'.._        :
+       \\             :--:########:            '.    .' :
+        \\..__...--.. :--:#######.'   '.         '.     :
+        :     :  : : '':'-:'':'::        .         '.  .'
+        '---'''..: :    ':    '..'''.      '.        :'
+           \\  :: : :     '      ''''''.     '.      .:
+            \\ ::  : :     '            '.      '      :
+             \\::   : :           ....' ..:       '     '.
+              \\::  : :    .....####\\ .~~.:.             :
+               \\':.:.:.:'#########.===. ~ |.'-.   . '''.. :
+                \\    .'  ########## \ \ _.' '. '-.       '''.
+                :\\  :     ########   \ \      '.  '-.        :
+               :  \\'    '   #### :    \ \      :.    '-.      :
+              :  .'\\   :'  :     :     \ \       :      '-.    :
+             : .'  .\\  '  :      :     :\ \       :        '.   :
+             ::   :  \\'  :.      :     : \ \      :          '. :
+             ::. :    \\  : :      :    ;  \ \     :           '.:
+              : ':    '\\ :  :     :     :  \:\     :        ..'
+                 :    ' \\ :        :     ;  \|      :   .'''
+                 '.   '  \\:                         :.''
+                  .:..... \\:       :            ..''
+                 '._____|'.\\......'''''''.:..'''
+                            \\
+                                """
 
 inp = sys.argv
 bash_input = inp[1:]
@@ -249,6 +283,61 @@ if '2' in steps:
     
     if None in [asl_tr, asl_pld, asl_ld]:
         raise Exception('TR, PLD and LD all must be defined (cannot be None)')
+        
+        
+    if do_run['trust']:
+        # if we're running trust, make sure the trust source image has TRUST_VEIN in the filename.
+        # otherwise the MATLAB script will break
+        
+        globber_trustsource = os.path.join(acquired_folder,'*SOURCE*TRUST*.PAR')
+        names_with_trustsource = glob.glob(globber_trustsource)
+        
+        try:
+            trustsource = names_with_trustsource[0]
+        except IndexError:
+            print('\nIt appears you do not have a source file for TRUST (pattern: *SOURCE*TRUST*.PAR)\nEither add this file to the folder, or exclude TRUST processing')
+            sys.exit()
+        
+        tv = 'TRUST_VEIN'
+        if tv in trustsource:
+            print(f'\nTRUST source\n----- {trustsource} -----\nis formatted correctly')
+        else:
+            print(f'\nWARNING: TRUST source\n----- {trustsource} -----\nis NOT formatted correctly')
+            has_ans = False
+            while not has_ans:
+                ans = input(f'\nI can try to fix the filenames for you, or you can exit processing and do it yourself. [fix/exit/info]\n')
+                if ans in ('fix','exit','info'):
+                    if ans == 'exit':
+                        has_ans = True
+                        raise Exception('Aborting processing')
+                    elif ans == 'fix':
+                        print('Okay. Renaming the files for you.')
+                        trust_source_base = trustsource[:-4]
+                        
+                        base = os.path.basename(trust_source_base)
+                        globber_base = os.path.join(acquired_folder,f'{base}.*')
+                        names_with_base = glob.glob(globber_base)
+                        
+                        for path in names_with_base:
+                            
+                            path_break = path.split('TRUST')
+                            new_path = 'TRUST_VEIN'.join(path_break)
+                            
+                            print(f'\n{path}\nto\n{new_path}\n')
+                            os.rename(path, new_path)
+                        
+                        for line in wizard.splitlines():
+                            print(line)
+                            time.sleep(0.05)
+                        print('magically fixed, free of charge\n')
+                        time.sleep(0.5)
+                        has_ans = True
+                    else:
+                        print(f'The TRUST source file must contain TRUST_VEIN somewhere in the filename')
+                        print(f'If you select "fix" the TRUST source PARREC will be modified to conform to this by adding _VEIN after wherever TRUST appears')
+                        
+                else:
+                    print('Answer must be "fix", "exit" or "info"')
     
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
