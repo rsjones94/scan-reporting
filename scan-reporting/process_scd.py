@@ -35,8 +35,10 @@ import subprocess
 import time
 import datetime
 import glob
+import shutil
 
 from helpers import get_terminal, str_time_elapsed
+import helpers as hp
 
 wizard = """                
                   ....
@@ -150,6 +152,48 @@ meta_file.close()
 print(f'\nBegin processing: {pretty_now}')
 
 
+acq_folder = os.path.join(in_folder, 'Acquired')
+orig_files = [os.path.join(acq_folder, f) for f in os.listdir(acq_folder) if os.path.isfile(os.path.join(acq_folder, f))]
+extensions = [f.split('.')[-1] for f in orig_files]
+guess_ext = hp.most_common(extensions)
+
+orig_data_copy_folder = os.path.join(in_folder, 'rawdata')
+    
+dcm_exts = ['dcm', 'DCM']
+parrec_exts = ['PAR', 'REC', 'V41', 'XML']
+nii_exts = ['nii.gz']
+
+if guess_ext in parrec_exts:
+    print('Input files seem to be PARREC - proceeding as normal')
+elif guess_ext in dcm_exts:
+    print('Input files seem to be DICOM - converting to PARREC before continuing (original DICOMs will be retained)')
+    shutil.copytree(acq_folder, orig_data_copy_folder)
+    shutil.rmtree(acq_folder)
+    os.mkdir(acq_folder)
+    
+    moved_files = [os.path.join(orig_data_copy_folder, f) for f in os.listdir(orig_data_copy_folder) if os.path.isfile(os.path.join(orig_data_copy_folder, f))]
+    moved_extensions = [f.split('.')[-1] for f in orig_files]
+    for fi, ext in zip(moved_files, moved_extensions):
+        if ext in dcm_exts:
+            #print(f'\n\n\nCONVERTING: {fi}')
+            hp.dicom_to_parrec(fi, acq_folder)      
+elif guess_ext in nii_exts:
+    has_ans = False
+    while not has_ans:
+        ans = input(f'\Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        if ans in ('acknowledge', 'cancel'):
+            has_ans = True
+            if ans == 'cancel':
+                raise Exception('Aborting processing')
+            elif ans == 'acknowledge':
+                print('Continuing with beta processing of NiFTIs')
+                raise Exception('SORRY! NiFTI processing not yet fully implemented in the process_scd.py pipeline')
+        else:
+            print('Answer must be "acknowledge" or "cancel"')
+else:
+    raise Exception(f'Filetype ({guess_ext}) does not seem to be supported')
+
+
 original_wd = os.getcwd()
 pt_id = replacement = get_terminal(in_folder) # if the input folder is named correctly, it is the ID that will replace the pt name
 
@@ -166,13 +210,15 @@ if '1' in steps:
     if not has_deid_name:
         has_ans = False
         while not has_ans:
-            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n]\n')
-            if ans in ('y','n'):
+            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n/change]\n')
+            if ans in ('y','n', 'change'):
                 has_ans = True
                 if ans == 'n':
                     raise Exception('Aborting processing')
+                elif ans == 'change':
+                    deidentify_name = input(f'Enter a new deidentification string to replace {deidentify_name}:\n')
             else:
-                print('Answer must be "y" or "n"')
+                print('Answer must be "y", "n" or "change')
         
     print(f'\nStep 1: deidentification. {deidentify_name} will be replaced with {replacement}')
         

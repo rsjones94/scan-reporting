@@ -9,6 +9,9 @@ Created on Thu Jul 30 12:38:31 2020
 import os
 import time
 from PIL import Image
+import shutil
+import itertools
+import operator
 
 from pptx import Presentation
 from pptx.util import Inches
@@ -203,3 +206,98 @@ def any_in_str(s, l):
     """
     
     return any([substr in s for substr in l])
+
+
+def dicom_to_parrec(filename, out_folder, path_to_perl_script='/Users/manusdonahue/Desktop/Projects/gstudy_converter/convert_dicom_to_xmlrec.pl'):
+    """
+    Calls Brian Welch's perl script that converts DICOMs to PARRECs (using default flags).
+    
+    The perl script by default creates 4 files (PAR, REC, V41 and XML) in a subfolder
+    within the directory that the target file is called xmlparrec, and the original
+    DICOM is renamed in the process. THIS SCRIPT creates a copy of the original DICOM
+    and destroys it and the xmlparrec folder after moving the output to out_folder.
+    
+    Note that this script uses the default renaming convention:
+        $Patient_Name$_$%02d%Acquisition_Number$_$%02d%Reconstruction_Number$_$SeriesTime$_($Protocol_Name$)
+    
+    Also note that you probably can't anticipate what the output names will be,
+    since that would require programatically inspecting the DICOM metedata. If you
+    could/wanted to do this you probably wouldn't be using this wrapper.
+    
+
+    Parameters
+    ----------
+    filename : pathlike
+        path to the dicom you wish to convert.
+    out_folder : pathlike
+        the directory to which the PARREC will be written.
+    path_to_perl_script : pathlike
+        path to the gstudy converter perl script.
+
+    Returns
+    -------
+    None.
+
+    """
+    new_wd = os.path.dirname(os.path.normpath(path_to_perl_script))
+    
+    old_wd = os.getcwd()
+    os.chdir(new_wd)
+    
+    parent_folder = os.path.dirname(os.path.normpath(filename))
+    file_basename = os.path.basename(os.path.normpath(filename))
+    tmp_folder = os.path.join(parent_folder, 'tmp')
+    xml_folder = os.path.join(tmp_folder, 'xmlparrec')
+    
+    if os.path.exists(tmp_folder):
+        shutil.rmtree(tmp_folder)
+    os.mkdir(tmp_folder)
+    copyname = os.path.join(tmp_folder, file_basename)
+    
+    shutil.copyfile(filename, copyname)
+    
+    try:
+    
+        call = f'perl {path_to_perl_script} -d {tmp_folder} -f {copyname}'
+        #print(f'Call: {call}')
+        os.system(call)
+        
+        conv_files = [f for f in os.listdir(xml_folder) if os.path.isfile(os.path.join(xml_folder, f))]
+        assert len(conv_files) == 4
+        
+        for fi in conv_files:
+            full_name = os.path.join(xml_folder, fi)
+            target = os.path.join(out_folder, fi)
+            shutil.move(full_name, target)
+            
+    except AssertionError:
+        print(f'Expected 4 files in {xml_folder}, but found {len(conv_files)}. Cleaning up....')
+    
+    finally:
+        shutil.rmtree(tmp_folder)
+        os.chdir(old_wd)
+    
+    
+def most_common(L):
+    """
+    Courtesy Alex Martelli
+    """
+    # get an iterable of (item, iterable) pairs
+    SL = sorted((x, i) for i, x in enumerate(L))
+    # print 'SL:', SL
+    groups = itertools.groupby(SL, key=operator.itemgetter(0))
+    # auxiliary function to get "quality" for an item
+    def _auxfun(g):
+      item, iterable = g
+      count = 0
+      min_index = len(L)
+      for _, where in iterable:
+        count += 1
+        min_index = min(min_index, where)
+      # print 'item %r, count %r, minind %r' % (item, count, min_index)
+      return count, -min_index
+    # pick the highest-count/earliest item
+    return max(groups, key=_auxfun)[0]
+    
+    
+    

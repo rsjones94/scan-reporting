@@ -52,11 +52,12 @@ import pandas as pd
 import nibabel as nib
 
 from helpers import get_terminal, str_time_elapsed, any_in_str, replace_in_ppt, analyze_ppt, add_ppt_image, add_ppt_image_ph, plot_dot
+import helpers as hp
 from report_image_generation import par2nii, nii_image
 
 inp = sys.argv
 bash_input = inp[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:d:g", ["infolder=","name=",'steps=','dob=', 'help'])
+options, remainder = getopt.getopt(bash_input, "i:n:s:d:c:g", ["infolder=","name=",'steps=','dob=', 'clean', 'help'])
 
 for opt, arg in options:
     if opt in ('-i', '--infile'):
@@ -83,6 +84,8 @@ try:
 except AssertionError:
     raise AssertionError('input folder does not exist')
     
+    
+
 
 
 
@@ -106,29 +109,74 @@ meta_file.close()
 print(f'\nBegin processing: {pretty_now}')
 
 
+
+
+
+
+acq_folder = os.path.join(in_folder, 'Acquired')
+orig_files = [os.path.join(acq_folder, f) for f in os.listdir(acq_folder) if os.path.isfile(os.path.join(acq_folder, f))]
+extensions = [f.split('.')[-1] for f in orig_files]
+guess_ext = hp.most_common(extensions)
+
+orig_data_copy_folder = os.path.join(in_folder, 'rawdata')
+    
+dcm_exts = ['dcm', 'DCM']
+parrec_exts = ['PAR', 'REC', 'V41', 'XML']
+nii_exts = ['nii', 'gz']
+
+if guess_ext in parrec_exts:
+    print('Input files seem to be PARREC - proceeding as normal')
+elif guess_ext in dcm_exts:
+    print('Input files seem to be DICOM - converting to PARREC before continuing (original DICOMs will be retained)')
+    shutil.copytree(acq_folder, orig_data_copy_folder)
+    shutil.rmtree(acq_folder)
+    os.mkdir(acq_folder)
+    
+    moved_files = [os.path.join(orig_data_copy_folder, f) for f in os.listdir(orig_data_copy_folder) if os.path.isfile(os.path.join(orig_data_copy_folder, f))]
+    moved_extensions = [f.split('.')[-1] for f in orig_files]
+    for fi, ext in zip(moved_files, moved_extensions):
+        if ext in dcm_exts:
+            #print(f'\n\n\nCONVERTING: {fi}')
+            hp.dicom_to_parrec(fi, acq_folder)
+elif guess_ext in nii_exts:
+    has_ans = False
+    while not has_ans:
+        ans = input(f'\Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        if ans in ('acknowledge', 'cancel'):
+            has_ans = True
+            if ans == 'cancel':
+                raise Exception('Aborting processing')
+            elif ans == 'acknowledge':
+                print('Continuing with beta processing of NiFTIs')
+        else:
+            print('Answer must be "acknowledge" or "cancel"')
+else:
+    raise Exception(f'Filetype ({guess_ext}) does not seem to be supported')
+
+
+
 original_wd = os.getcwd()
 pt_id = replacement = get_terminal(in_folder) # if the input folder is named correctly, it is the ID that will replace the pt name
 
 if '1' in steps:
     ##### step 1 : deidentification
     
-    try:
-        assert type(deidentify_name) == str
-    except AssertionError:
-        raise AssertionError('patient name must be a string')
+    assert type(deidentify_name) == str, 'patient name must be a string'
         
-    files_of_interest = os.listdir(os.path.join(in_folder, 'acquired'))
+    files_of_interest = os.listdir(os.path.join(in_folder, 'Acquired'))
     has_deid_name = any([deidentify_name in f for f in files_of_interest])
     if not has_deid_name:
         has_ans = False
         while not has_ans:
-            ans = input(f'\nName "{deidentify_name}" not found in acquired folder. Would you like to proceed anyway? [y/n]\n')
-            if ans in ('y','n'):
+            ans = input(f'\nName "{deidentify_name}" not found in Acquired folder. Would you like to proceed anyway? [y/n/change]\n')
+            if ans in ('y','n', 'change'):
                 has_ans = True
                 if ans == 'n':
                     raise Exception('Aborting processing')
+                elif ans == 'change':
+                    deidentify_name = input(f'Enter a new deidentification string to replace {deidentify_name}:\n')
             else:
-                print('Answer must be "y" or "n"')
+                print('Answer must be "y", "n" or "change')
         
     print(f'\nStep 1: deidentification. {deidentify_name} will be replaced with {replacement}')
         
@@ -176,7 +224,7 @@ if '2' in steps:
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/BOLD/Scripts/'
     os.chdir(processing_scripts_loc)
-    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nojvm -nodesktop -nosplash -r "Master('{pt_id}','{asltype}',{dynamics},{pcaslBool})"'''
+    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master('{pt_id}','{asltype}',{dynamics},{pcaslBool})"'''
     
     # print(processing_input)
     
@@ -226,7 +274,7 @@ if '4' in steps:
     
 
 signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
-                               {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'acquired', 'ext':'PAR', 'cmap':matplotlib.cm.gray, 'dims':(4,6)},
+                               {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'Acquired', 'ext':'PAR', 'cmap':matplotlib.cm.gray, 'dims':(4,6)}, # THIS NEEDS TO BE UPDATED - the input FLAIR will not always be PAR!
                            ('CBF_MNI',):
                                {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                            ('ZSTAT1_MNI_normalized',):
@@ -266,7 +314,10 @@ if '5' in steps:
     for signature, subdict in signature_relationships.items():
         
         if has_thresh_file:
-            cmax = float(thresh_data.loc[subdict['basename']])
+            try:
+                cmax = float(thresh_data.loc[subdict['basename']])
+            except KeyError:
+                cmax=None
         else:
             cmax = None
             
@@ -325,24 +376,52 @@ if '6' in steps:
             has_age = 1
     except NameError:
         pt_age = 0
-    
-    
-    where_glob = os.path.join(in_folder, 'acquired', "**", f'*.PAR') # just looking for any PAR
-    potential = glob.glob(where_glob, recursive=True)
-    read_this_one = potential[-1]
-    fob = open(read_this_one)
-    info = nib.parrec.parse_PAR_header(fob)
-    info_dict = info[0]
-    if 'exam_date' in info_dict:
-        try:
-            raw_scan_date = info_dict['exam_date']
-            sd = raw_scan_date.split(' / ')[0]
-            format_str = '%Y.%m.%d' # The format
-            scan_dt_obj = datetime.datetime.strptime(sd, format_str)
-            has_scan_date = 1
-        except:
-            print('Something went wrong with extracting the scan date, though the PAR file does seem to have a scan date')
+
+    try:
+        where_glob = os.path.join(in_folder, 'Acquired', "**", f'*.PAR') # just looking for any PAR
+        potential = glob.glob(where_glob, recursive=True)
+        read_this_one = potential[-1]
+        fob = open(read_this_one)
+        info = nib.parrec.parse_PAR_header(fob)
+        info_dict = info[0]
+        if 'exam_date' in info_dict:
+            try:
+                raw_scan_date = info_dict['exam_date']
+                sd = raw_scan_date.split(' / ')[0]
+                format_str = '%Y.%m.%d' # The format
+                scan_dt_obj = datetime.datetime.strptime(sd, format_str)
+                has_scan_date = 1
+            except:
+                print('Something went wrong with extracting the scan date, though the PAR file does seem to have a scan date')
+                pt_age = 0
+    except IndexError:
+        where_glob = os.path.join(in_folder, 'Acquired', "**", f'*.nii*') # just looking for any NiFTI
+        potential = glob.glob(where_glob, recursive=True)
+        read_this_one = potential[-1]
+        fob = nib.load(read_this_one)
+        head = fob.header
         
+        print("Unfortunately NiFTI headers do not seem to store scan dates. You'll have to set it yourself!")
+        pt_age = 0
+        
+
+    if not has_scan_date:
+        has_ans = False
+        while not has_ans:
+            ans = input(f'No scan date found. You can manually enter it now, or skip it\n(YYYY.mm.dd / skip)\n')
+            if ans == 'skip':
+                has_ans = True
+            else:
+                try:    
+                    format_str = '%Y.%m.%d' # The format
+                    scan_dt_obj = datetime.datetime.strptime(ans, format_str)
+                    has_scan_date = 1
+                    sd = ans
+                    has_ans = True
+                except ValueError:
+                    print('\nAnswer must be "skip" or a date formatted as YYYY.mm.dd')
+    
+
     if has_scan_date and has_dob:
         pt_age = scan_dt_obj - dob_dt_obj
         pt_age = int(pt_age.days/365.25)
@@ -477,5 +556,5 @@ if '6' in steps:
             
     pres.save(template_out)
     print(f'\nPowerpoint generated. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
-    
+
 print(f'\nProcessing complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes\n')
