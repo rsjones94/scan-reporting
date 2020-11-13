@@ -161,7 +161,7 @@ orig_data_copy_folder = os.path.join(in_folder, 'rawdata')
     
 dcm_exts = ['dcm', 'DCM']
 parrec_exts = ['PAR', 'REC', 'V41', 'XML']
-nii_exts = ['nii.gz']
+nii_exts = ['nii', 'gz']
 
 if guess_ext in parrec_exts:
     print('Input files seem to be PARREC - proceeding as normal')
@@ -180,14 +180,14 @@ elif guess_ext in dcm_exts:
 elif guess_ext in nii_exts:
     has_ans = False
     while not has_ans:
-        ans = input(f'\Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        ans = input(f'Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
         if ans in ('acknowledge', 'cancel'):
             has_ans = True
             if ans == 'cancel':
                 raise Exception('Aborting processing')
             elif ans == 'acknowledge':
                 print('Continuing with beta processing of NiFTIs')
-                raise Exception('SORRY! NiFTI processing not yet fully implemented in the process_scd.py pipeline')
+                #raise Exception('SORRY! NiFTI processing not yet fully implemented in the process_scd.py pipeline')
         else:
             print('Answer must be "acknowledge" or "cancel"')
 else:
@@ -243,8 +243,8 @@ if '2' in steps:
     acquired_folder = os.path.join(in_folder, 'Acquired')
     
     
-    globber_pld = os.path.join(acquired_folder,'*PLD*.PAR')
-    globber_ld = os.path.join(acquired_folder,'*LD*.PAR')
+    globber_pld = os.path.join(acquired_folder,'*PLD*')
+    globber_ld = os.path.join(acquired_folder,'*LD*')
     
     names_with_pld = glob.glob(globber_pld)
     names_with_ld = glob.glob(globber_ld)
@@ -276,19 +276,25 @@ if '2' in steps:
         if pld_name != ld_name:
             raise Exception(f'\n{pld_name} != {ld_name}\nPLD and LD parameters not found in same file. Please configure filenames so PLD and LD are specified in the pCASL source file')
             
-        pcasl_meta = open(pld_name)
-        pcasl_lines = pcasl_meta.read().split('\n')
-        candidate_lines = [i for i in pcasl_lines if 'Repetition time' in i]
-        candidate_line = candidate_lines[0]
-        candidate_broken = candidate_line.split(' ')
+        if 'PAR' in pld_name or 'REC' in pld_name:
+            pcasl_meta = open(pld_name)
+            pcasl_lines = pcasl_meta.read().split('\n')
+            candidate_lines = [i for i in pcasl_lines if 'Repetition time' in i]
+            candidate_line = candidate_lines[0]
+            candidate_broken = candidate_line.split(' ')
         
-        tr = None
-        for c in candidate_broken:
-            try:
-                tr = float(c) / 1000 # value is given in ms, need s
-                break
-            except ValueError:
-                pass
+            tr = None
+            for c in candidate_broken:
+                try:
+                    tr = float(c) / 1000 # value is given in ms, need s
+                    break
+                except ValueError:
+                    pass
+        else:
+            tr = 4
+            candidate_line = 'There is no candidate line for tr for non-PARREC files'
+            print("Just so you know, I can't extract the repetition time (tr) from non-PARREC files")
+            print("tr is generally 4 seconds, so I've set it for you. You can still change it though.")
         
         pld_split = pld_name.split('_')
         ld_split = ld_name.split('_')
@@ -335,14 +341,13 @@ if '2' in steps:
         # if we're running trust, make sure the trust source image has TRUST_VEIN in the filename.
         # otherwise the MATLAB script will break
         
-        globber_trustsource = os.path.join(acquired_folder,'*SOURCE*TRUST*.PAR')
+        globber_trustsource = os.path.join(acquired_folder,'*SOURCE*TRUST*')
         names_with_trustsource = glob.glob(globber_trustsource)
         
         try:
             trustsource = names_with_trustsource[0]
         except IndexError:
-            print('\nIt appears you do not have a source file for TRUST (pattern: *SOURCE*TRUST*.PAR)\nEither add this file to the folder, or exclude TRUST processing')
-            sys.exit()
+            raise Exception('\nIt appears you do not have a source file for TRUST (pattern: *SOURCE*TRUST*)\nEither add this file to the folder, or exclude TRUST processing')
         
         tv = 'TRUST_VEIN'
         if tv in trustsource:
@@ -358,9 +363,9 @@ if '2' in steps:
                         raise Exception('Aborting processing')
                     elif ans == 'fix':
                         print('Okay. Renaming the files for you.')
-                        trust_source_base = trustsource[:-4]
                         
-                        base = os.path.basename(trust_source_base)
+                        base = os.path.basename(trustsource)
+                        base = base.split('.')[0]
                         globber_base = os.path.join(acquired_folder,f'{base}.*')
                         names_with_base = glob.glob(globber_base)
                         
@@ -380,7 +385,7 @@ if '2' in steps:
                         has_ans = True
                     else:
                         print(f'The TRUST source file must contain TRUST_VEIN somewhere in the filename')
-                        print(f'If you select "fix" the TRUST source PARREC will be modified to conform to this by adding _VEIN after wherever TRUST appears')
+                        print(f'If you select "fix" the TRUST source file(s) will be modified to conform to this by adding _VEIN after wherever TRUST appears')
                         
                 else:
                     print('Answer must be "fix", "exit" or "info"')

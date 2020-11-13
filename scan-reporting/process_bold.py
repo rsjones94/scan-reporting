@@ -141,7 +141,7 @@ elif guess_ext in dcm_exts:
 elif guess_ext in nii_exts:
     has_ans = False
     while not has_ans:
-        ans = input(f'\Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        ans = input(f'Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
         if ans in ('acknowledge', 'cancel'):
             has_ans = True
             if ans == 'cancel':
@@ -153,6 +153,10 @@ elif guess_ext in nii_exts:
 else:
     raise Exception(f'Filetype ({guess_ext}) does not seem to be supported')
 
+if guess_ext in nii_exts:
+    fig_ext = 'nii.gz'
+else:
+    fig_ext = guess_ext
 
 
 original_wd = os.getcwd()
@@ -274,7 +278,7 @@ if '4' in steps:
     
 
 signature_relationships = {('FLAIR_AX', 'T2W_FLAIR'):
-                               {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'Acquired', 'ext':'PAR', 'cmap':matplotlib.cm.gray, 'dims':(4,6)}, # THIS NEEDS TO BE UPDATED - the input FLAIR will not always be PAR!
+                               {'basename': 'axFLAIR', 'excl':['cor','COR','coronal','CORONAL'], 'isin':'Acquired', 'ext':fig_ext, 'cmap':matplotlib.cm.gray, 'dims':(4,6)}, # THIS NEEDS TO BE UPDATED - the input FLAIR will not always be PAR!
                            ('CBF_MNI',):
                                {'basename': 'CBF', 'excl':[], 'isin':'processed', 'ext':'nii.gz', 'cmap':matplotlib.cm.jet, 'dims':(3,10)},
                            ('ZSTAT1_MNI_normalized',):
