@@ -5,7 +5,8 @@ help_info = """
 This script takes raw scan data for SCD scans and processes it completely.
 This involves:
     1) deidentifying the scans
-    2) Running TRUST and generating derived images
+    2) running TRUST and generating derived images
+    3) pushing the results to REDCap
     
     
 input:
@@ -36,6 +37,10 @@ import time
 import datetime
 import glob
 import shutil
+import requests
+
+import redcap
+import pandas as pd
 
 from helpers import get_terminal, str_time_elapsed
 import helpers as hp
@@ -125,7 +130,7 @@ try:
         steps = '12'
 except NameError:
     print('-s not specified. running all steps')
-    steps = '12'
+    steps = '123'
         
 try:
     assert os.path.isdir(in_folder)
@@ -196,6 +201,86 @@ else:
 
 original_wd = os.getcwd()
 pt_id = replacement = get_terminal(in_folder) # if the input folder is named correctly, it is the ID that will replace the pt name
+
+
+
+# check the redcap database to make sure the folder name is (pt_id) is in the redcap database
+
+print('\nContacting the REDCap database...')
+
+name_in_redcap = True
+
+try:
+    api_url = 'https://redcap.vanderbilt.edu/api/'
+    token_loc = '/Users/manusdonahue/Desktop/Projects/redcaptoken_real.txt'
+    token = open(token_loc).read()
+    
+    project = redcap.Project(api_url, token)
+    project_data_raw = project.export_records()
+    project_data = pd.DataFrame(project_data_raw)
+    
+    mri_cols = ['mr1_mr_id',
+                'mr2_mr_id',
+                'mr3_mr_id',
+                'mr4_mr_id',
+                'mr5_mr_id',
+                'mr6_mr_id'
+                ]
+
+    
+    which_scan = [pt_id in list(project_data[i]) for i in mri_cols]
+    
+    if not any(which_scan):
+        has_ans = False
+        while not has_ans:
+            print(f'The mr_id ({pt_id}) was not found in the REDCap database')
+            print("You can still process this data, but you won't be able to push the results to REDCap automatically")
+            ans = input('Is this okay? [y/n]\n')
+            if ans in ('y','n'):
+                has_ans = True
+                if ans == 'n':
+                    raise Exception('Aborting processing')
+                elif ans == 'y':
+                    print(f'Continuing with processing. Remember to fix the discrepancy between the local and REDCap mr_id values.')
+                    time.sleep(3)
+                    name_in_redcap = False
+            else:
+                print('Answer must be "y" or "n"')
+    else:
+        if sum(which_scan) > 1:
+            raise Exception(f'The patient id ({pt_id}) appears in more than one mr_id column in the REDCap database\n{[(i,j) for i,j in zip(mri_cols, which_scan)]}\nPlease correct the database')
+        
+        has_ans = False
+        while not has_ans:
+            print(f"MR ID {pt_id} appears to correspond to scan number {which_scan.index(True)+1} for this patient")
+            print(f'(the mr_id was found in column {mri_cols[which_scan.index(True)]})')
+            ans = input(f'Please confirm that this is correct, especially if you intend to push processing results to REDCap. [y/n]\n')
+            if ans in ('y','n'):
+                has_ans = True
+                if ans == 'n':
+                    raise Exception('Aborting processing')
+                elif ans == 'y':
+                    scan_index = which_scan.index(True)
+                    scan_mr_col = mri_cols[scan_index]
+                    studyid_index_data = project_data.set_index('study_id')
+                    
+                    inds = studyid_index_data[scan_mr_col] == pt_id
+                    cands = studyid_index_data[inds]
+                    
+                    if len(cands) != 1:
+                        raise Exception(f'There are {len(cands)} mr_id candidates in the database. There must be exactly one')
+                    
+                    study_id = cands.index[0]
+                    
+                    print(f'The study id is {study_id}')
+                    
+            else:
+                print('Answer must be "y" or "n"')
+except requests.exceptions.RequestException:
+    print(f"Could not make contact with the REDCap database. You won't be able to push data to REDCap automatically")
+    print("This is usually due to lack of internet connection or REDCap being down")
+    name_in_redcap = False
+    time.sleep(3)
 
 if '1' in steps:
     ##### step 1 : deidentification
@@ -404,5 +489,83 @@ if '2' in steps:
     
     print(f'\nMain processing complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
     
+if '3' in steps and name_in_redcap:    
+    ##### step 3 : main processing
+    print(f'\nStep 3: pushing results to REDCap\n')
+    
+    fields_of_interest_raw = [
+                            'mrINDEX_lparietal_gm_cbf',
+                            'mrINDEX_rparietal_gm_cbf',
+                            'mrINDEX_lfrontal_gm_cbf',
+                            'mrINDEX_rfrontal_gm_cbf',
+                            'mrINDEX_loccipital_gm_cbf',
+                            'mrINDEX_roccipital_gm_cbf',
+                            'mrINDEX_ltemporal_gm_cbf',
+                            'mrINDEX_rtemporal_gm_cbf',
+                            'mrINDEX_lcerebellum_gm_cbf',
+                            'mrINDEX_rcerebellum_gm_cbf',
+                            'mrINDEX_recalc_gm_cbf',
+                            'mrINDEX_recalc_wm_cbf',
+                            'mrINDEX_white_cbv',
+                            'mrINDEX_grey_cbv',
+                            'mrINDEX_csf_cbv',
+                            'mrINDEX_relaxation_rate1',
+                            'mrINDEX_relaxation_rate2',
+                            'mrINDEX_venous_oxygen_sat1', #bovine
+                            'mrINDEX_venous_oxygen_sat2', #bovine
+                            'mrINDEX_aa_model_venous_oxygen_sat1',
+                            'mrINDEX_aa_model_venous_oxygen_sat2',
+                            'mrINDEX_ss_model_venous_oxygen_sat1',
+                            'mrINDEX_ss_model_venous_oxygen_sat2',
+                            'mrINDEX_f_model_venous_oxygen_sat1',
+                            'mrINDEX_f_model_venous_oxygen_sat2'
+                         ]
+    
+    fields_of_interest = [i.replace('INDEX', str(scan_index+1)) for i in fields_of_interest_raw]
+    processed_csv = os.path.join(in_folder, f'{pt_id}_PROCESSINGresults.csv')
+    
+    data_row = studyid_index_data.loc[study_id]
+    old_data = {i:data_row[i] for i in fields_of_interest}
+    new_data = hp.parse_scd_csv(processed_csv, scan_index)
+    
+    print(f'\nThe following changes will be made to study ID {study_id} ({scan_mr_col}):')
+    for key in old_data:
+        time.sleep(0.1)
+        oldy = old_data[key]
+        if oldy == '':
+            oldy = 'NOTHING'
+        newy = new_data[key]
+        print(f'\t{key} : {oldy} ---> {newy}')
+        
+    has_ans = False
+    while not has_ans:
+        ans = input(f'\nPush to database? Note that these results will not be correct if processing (asl+vol+TRUST) is not complete. [y/n]\n')
+        if ans in ('y','n'):
+            has_ans = True
+            if ans == 'n':
+                print('Data will not be pushed')
+            elif ans == 'y':
+                print('Pushing to database - this takes about a minute')
+                for key, val in new_data.items():
+                    studyid_index_data.loc[study_id][key] = val
+                np = project.import_records(studyid_index_data)
+                print(f'REDCap data import message: {np}')
+                    
+                print(f'\nData import complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
+        else:
+            print('Answer must be "y" or "n"')
+    
+elif '3' in steps and not name_in_redcap:
+    print(f"\nSkipping Step 3: can't push to REDCap as either the mr_id is not in the database or the database could not be contacted")
+    
+
+    
+
+    
     
 print(f'\nProcessing complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes\n')
+
+
+
+
+

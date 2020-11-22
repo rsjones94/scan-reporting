@@ -12,9 +12,11 @@ from PIL import Image
 import shutil
 import itertools
 import operator
+import re
 
 from pptx import Presentation
 from pptx.util import Inches
+import pandas as pd
 
 
 def replace_in_ppt(search_str, repl_str, filename):
@@ -298,6 +300,42 @@ def most_common(L):
       return count, -min_index
     # pick the highest-count/earliest item
     return max(groups, key=_auxfun)[0]
+
+
+def parse_scd_csv(in_csv, scan_index):
     
+    raw = open(in_csv).readlines()
     
+    stripped_to_nums = [re.sub('[^0-9,.]', "", i).split(',') for i in raw] # regex to leave only numbers, commas and periodsd, then split by commas
+    
+    parsed = {
+                    f'mr{scan_index+1}_lparietal_gm_cbf':stripped_to_nums[15][0],
+                    f'mr{scan_index+1}_rparietal_gm_cbf':stripped_to_nums[15][1],
+                    f'mr{scan_index+1}_lfrontal_gm_cbf':stripped_to_nums[15][2],
+                    f'mr{scan_index+1}_rfrontal_gm_cbf':stripped_to_nums[15][3],
+                    f'mr{scan_index+1}_loccipital_gm_cbf':stripped_to_nums[15][4],
+                    f'mr{scan_index+1}_roccipital_gm_cbf':stripped_to_nums[15][5],
+                    f'mr{scan_index+1}_ltemporal_gm_cbf':stripped_to_nums[15][6],
+                    f'mr{scan_index+1}_rtemporal_gm_cbf':stripped_to_nums[15][7],
+                    f'mr{scan_index+1}_lcerebellum_gm_cbf':stripped_to_nums[15][8],
+                    f'mr{scan_index+1}_rcerebellum_gm_cbf':stripped_to_nums[15][9],
+                    f'mr{scan_index+1}_recalc_gm_cbf':stripped_to_nums[15][10],
+                    f'mr{scan_index+1}_recalc_wm_cbf':stripped_to_nums[15][11],
+                    f'mr{scan_index+1}_white_cbv':stripped_to_nums[7][0],
+                    f'mr{scan_index+1}_grey_cbv':stripped_to_nums[8][0],
+                    f'mr{scan_index+1}_csf_cbv':stripped_to_nums[9][0],
+                    f'mr{scan_index+1}_relaxation_rate1':str(1/float(stripped_to_nums[2][1])),
+                    f'mr{scan_index+1}_relaxation_rate2':str(1/float(stripped_to_nums[2][3])),
+                    f'mr{scan_index+1}_venous_oxygen_sat1':str(float(stripped_to_nums[3][1])*100), #bovine
+                    f'mr{scan_index+1}_venous_oxygen_sat2':str(float(stripped_to_nums[3][3])*100), #bovine
+                    f'mr{scan_index+1}_aa_model_venous_oxygen_sat1':str(float(stripped_to_nums[5][1])*100),
+                    f'mr{scan_index+1}_aa_model_venous_oxygen_sat2':str(float(stripped_to_nums[5][3])*100),
+                    f'mr{scan_index+1}_ss_model_venous_oxygen_sat1':str(float(stripped_to_nums[6][1])*100),
+                    f'mr{scan_index+1}_ss_model_venous_oxygen_sat2':str(float(stripped_to_nums[6][3])*100),
+                    f'mr{scan_index+1}_f_model_venous_oxygen_sat1':str(float(stripped_to_nums[4][1])*100),
+                    f'mr{scan_index+1}_f_model_venous_oxygen_sat2':str(float(stripped_to_nums[4][3])*100)
+                    
+                 }
+    
+    return parsed
     
