@@ -19,10 +19,13 @@ input:
         to only go through step 2. Because there are only steps, multistep specification isn't really needed,
             but you can explicitly specify steps 1 and 2 by passing -s 12
     -h / --hct : the hematocrit as a float between 0 and 1. Required for step 2
+        you can also pass redcap as an argument, and the script will look for the hct value in REDCap and use that
     -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0).
         Note that the program will attempt to automatically invert the TRUST
         if needed, so only pass 1 if the results are still wrong
-    -p / --pttype : the type of patient. 'sca' or 'control'. Required for step 2
+    -p / --pttype : the type of patient. 'sca', 'anemia' or 'control'. Required for step 2
+        note that 'sca' and 'anemia' trigger the same processing protocol
+        you can also pass redcap as an argument, and the script will look for the pt type value in REDCap and use that
     -e / --exclude: subprocessing steps to exclude. The subprocessing steps are
     TRUST (trust), volumetrics (vol) and ASL (asl). To exclude a step, or steps,
     enter the steps to exclude separated by a comma, e.g., -e vol,trust
@@ -102,17 +105,22 @@ for opt, arg in options:
     elif opt in ('-s', '--steps'):
         steps = arg
     elif opt in ('-h', '--hct'):
-        hematocrit = float(arg)
-        if hematocrit > 1 or hematocrit < 0:
-            raise Exception('Hematocrit must be between 0 and 1')
+        if arg != 'redcap':
+            hematocrit = float(arg)
+            if hematocrit > 1 or hematocrit < 0:
+                raise Exception('Hematocrit must be between 0 and 1')
+        else:
+            hematocrit = arg
     elif opt in ('-f', '--flip'):
         flip = int(arg)
     elif opt in ('-p', '--pttype'):
         pt_type = arg
         if pt_type == 'control':
             pt_type_num = 0
-        elif pt_type == 'sca':
+        elif pt_type == 'sca' or pt_type == 'anemia':
             pt_type_num = 1
+        elif pt_type == 'redcap':
+            pt_type_num = pt_type
         else:
             raise Exception('Patient type must be "sca" or "control"')
     elif opt in ('-e', '--excl'):
@@ -212,7 +220,7 @@ name_in_redcap = True
 
 try:
     api_url = 'https://redcap.vanderbilt.edu/api/'
-    token_loc = '/Users/manusdonahue/Desktop/Projects/redcaptoken_real.txt'
+    token_loc = '/Users/manusdonahue/Desktop/Projects/redcaptoken_scd_real.txt'
     token = open(token_loc).read()
     
     project = redcap.Project(api_url, token)
@@ -234,7 +242,7 @@ try:
         has_ans = False
         while not has_ans:
             print(f'The mr_id ({pt_id}) was not found in the REDCap database')
-            print("You can still process this data, but you won't be able to push the results to REDCap automatically")
+            print("You can still process this data, but you won't be able to push the results to REDCap automatically, and I won't be able to find the patient's hct.")
             ans = input('Is this okay? [y/n]\n')
             if ans in ('y','n'):
                 has_ans = True
@@ -242,6 +250,8 @@ try:
                     raise Exception('Aborting processing')
                 elif ans == 'y':
                     print(f'Continuing with processing. Remember to fix the discrepancy between the local and REDCap mr_id values.')
+                    if 'redcap' in [hematocrit, pt_type_num]:
+                        raise Exception('Cannot use pull hct or pt type from REDCap without a database connection')
                     time.sleep(3)
                     name_in_redcap = False
             else:
@@ -254,7 +264,7 @@ try:
         while not has_ans:
             print(f"MR ID {pt_id} appears to correspond to scan number {which_scan.index(True)+1} for this patient")
             print(f'(the mr_id was found in column {mri_cols[which_scan.index(True)]})')
-            ans = input(f'Please confirm that this is correct, especially if you intend to push processing results to REDCap. [y/n]\n')
+            ans = input(f'Please confirm that this is correct, especially if you intend to push processing results to REDCap or are using the database values for hct/pt type. [y/n]\n')
             if ans in ('y','n'):
                 has_ans = True
                 if ans == 'n':
@@ -272,6 +282,25 @@ try:
                     
                     study_id = cands.index[0]
                     
+                    if hematocrit == 'redcap':
+                        try:
+                            hematocrit = float(cands.iloc[0][f'blood_draw_hct{scan_index+1}'])/100
+                        except ValueError:
+                            raise Exception(f'There is no hct value in blood_draw_hct{scan_index+1} in REDCap')
+                        print(f'The study hematocrit I found is {hematocrit}')
+                        
+                    if pt_type_num == 'redcap':
+                        the_num = cands.iloc[0]['case_control']
+                        if the_num == '0':
+                            pt_type_num = 0
+                            descrip = 'control'
+                        elif the_num == '1':
+                            pt_type_num = 1
+                            descrip = 'scd'
+                        elif the_num == '2':
+                            pt_type_num = 1
+                            descrip = 'anemia'
+                        print(f'The patient type I found is {the_num} ({descrip})')
                     print(f'The study id is {study_id}')
                     
             else:
