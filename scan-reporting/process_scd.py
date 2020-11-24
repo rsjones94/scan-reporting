@@ -303,6 +303,8 @@ try:
                         print(f'The patient type I found is {the_num} ({descrip})')
                     print(f'The study id is {study_id}')
                     
+                    time.sleep(3)
+                    
             else:
                 print('Answer must be "y" or "n"')
 except requests.exceptions.RequestException:
@@ -575,6 +577,12 @@ if '3' in steps and name_in_redcap:
                 print('Data will not be pushed')
             elif ans == 'y':
                 print('Pushing to database - this takes about a minute')
+                
+                project = redcap.Project(api_url, token) # we need to pull a fresh copy of the database in case someone else had been modifying it during processing
+                project_data_raw = project.export_records()
+                project_data = pd.DataFrame(project_data_raw)
+                studyid_index_data = project_data.set_index('study_id')
+                
                 for key, val in new_data.items():
                     studyid_index_data.loc[study_id][key] = val
                 np = project.import_records(studyid_index_data)
