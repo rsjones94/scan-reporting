@@ -193,7 +193,7 @@ elif guess_ext in dcm_exts:
 elif guess_ext in nii_exts:
     has_ans = False
     while not has_ans:
-        ans = input(f'Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS. Please acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        ans = input(f'Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS.\nAlso note that volumetric calculations may be differ slightly from those obtained from the PARREC pipeline.\nPlease acknowledge this or cancel processing. [acknowledge/cancel]\n')
         if ans in ('acknowledge', 'cancel'):
             has_ans = True
             if ans == 'cancel':
