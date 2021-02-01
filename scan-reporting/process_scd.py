@@ -135,7 +135,7 @@ for opt, arg in options:
 
 try:
     if steps == '0':
-        steps = '12'
+        steps = '123'
 except NameError:
     print('-s not specified. running all steps')
     steps = '123'
@@ -359,8 +359,8 @@ if '2' in steps:
     acquired_folder = os.path.join(in_folder, 'Acquired')
     
     
-    globber_pld = os.path.join(acquired_folder,'*PLD*')
-    globber_ld = os.path.join(acquired_folder,'*LD*')
+    globber_pld = os.path.join(acquired_folder,'*_PLD*')
+    globber_ld = os.path.join(acquired_folder,'*_LD*')
     
     names_with_pld = glob.glob(globber_pld)
     names_with_ld = glob.glob(globber_ld)
@@ -570,8 +570,8 @@ if '3' in steps and name_in_redcap:
         
     has_ans = False
     while not has_ans:
-        ans = input(f'\nPush to database? Note that these results will not be correct if processing (asl+vol+TRUST) is not complete. [y/n]\n')
-        if ans in ('y','n'):
+        ans = input(f'\nPush to database? Note that these results will not be correct if processing (asl+vol+TRUST) is not complete. [y/n/wipe]\n')
+        if ans in ('y','n','wipe'):
             has_ans = True
             if ans == 'n':
                 print('Data will not be pushed')
@@ -589,8 +589,19 @@ if '3' in steps and name_in_redcap:
                 print(f'REDCap data import message: {np}')
                     
                 print(f'\nData import complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
+            elif ans =='wipe':
+                print('Wiping REDCap entries for this scan - this takes about a minute (AND DOES NOT ACTUALLY WORK)')
+                project = redcap.Project(api_url, token) # we need to pull a fresh copy of the database in case someone else had been modifying it during processing
+                project_data_raw = project.export_records()
+                project_data = pd.DataFrame(project_data_raw)
+                studyid_index_data = project_data.set_index('study_id')
+                
+                for key, val in new_data.items():
+                    studyid_index_data.loc[study_id][key] = ''
+                np = project.import_records(studyid_index_data)
+                print(f'REDCap data import message: {np}')
         else:
-            print('Answer must be "y" or "n"')
+            print('Answer must be "y", "n" or "wipe" (which will clear the displayed fields for this scan)')
     
 elif '3' in steps and not name_in_redcap:
     print(f"\nSkipping Step 3: can't push to REDCap as either the mr_id is not in the database or the database could not be contacted")
