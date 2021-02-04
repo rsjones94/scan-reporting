@@ -7,6 +7,9 @@ This involves:
     1) deidentifying the scans
     2) running TRUST and generating derived images
     3) pushing the results to REDCap
+    4) generate a pdf report
+    
+Requires T1, ASL and TRUST scans to fully run
     
     
 input:
@@ -27,8 +30,9 @@ input:
         note that 'sca' and 'anemia' trigger the same processing protocol
         you can also pass redcap as an argument, and the script will look for the pt type value in REDCap and use that
     -e / --exclude: subprocessing steps to exclude. The subprocessing steps are
-    TRUST (trust), volumetrics (vol) and ASL (asl). To exclude a step, or steps,
-    enter the steps to exclude separated by a comma, e.g., -e vol,trust
+        TRUST (trust), volumetrics (vol) and ASL (asl). To exclude a step, or steps,
+        enter the steps to exclude separated by a comma, e.g., -e vol,trust
+    -a / --artox: the arterial oxygen saturation from the pulse oximeter, reported as a number between 0 and 1. Only required if generating the report (step 4)
     -g / --help : brings up this helpful information. does not take an argument
 """
 
@@ -44,9 +48,15 @@ import requests
 
 import redcap
 import pandas as pd
+from pylab import title, figure, xlabel, ylabel, xticks, bar, legend, axis, savefig
+import matplotlib
+from fpdf import FPDF
+import numpy as np
+import matplotlib.pyplot as plt
 
 from helpers import get_terminal, str_time_elapsed
 import helpers as hp
+from report_image_generation import par2nii, nii_image
 
 wizard = """                
                   ....
@@ -85,7 +95,7 @@ wizard = """
 
 inp = sys.argv
 bash_input = inp[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:g", ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl=', 'help'])
+options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:a:g", ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl=', 'artox=', 'help'])
 
 
 
@@ -132,13 +142,20 @@ for opt, arg in options:
     elif opt in ('-g', '--help'):
         print(help_info)
         sys.exit()
+    elif opt in ('-a', '--artox'):
+        if arg != 'redcap':
+            art_ox_sat = float(arg)
+            if art_ox_sat > 1 or art_ox_sat < 0:
+                raise Exception('Arterial oxygenation fraction must be between 0 and 1')
+        else:
+            art_ox_sat = arg
 
 try:
     if steps == '0':
-        steps = '123'
+        steps = '1234'
 except NameError:
     print('-s not specified. running all steps')
-    steps = '123'
+    steps = '1234'
         
 try:
     assert os.path.isdir(in_folder)
@@ -282,26 +299,42 @@ try:
                     
                     study_id = cands.index[0]
                     
-                    if hematocrit == 'redcap':
-                        try:
-                            hematocrit = float(cands.iloc[0][f'blood_draw_hct{scan_index+1}'])/100
-                        except ValueError:
-                            raise Exception(f'There is no hct value in blood_draw_hct{scan_index+1} in REDCap')
-                        print(f'The study hematocrit I found is {hematocrit}')
-                        
-                    if pt_type_num == 'redcap':
-                        the_num = cands.iloc[0]['case_control']
-                        if the_num == '0':
-                            pt_type_num = 0
-                            descrip = 'control'
-                        elif the_num == '1':
-                            pt_type_num = 1
-                            descrip = 'scd'
-                        elif the_num == '2':
-                            pt_type_num = 1
-                            descrip = 'anemia'
-                        print(f'The patient type I found is {the_num} ({descrip})')
-                    print(f'The study id is {study_id}')
+                    try:
+                        if hematocrit == 'redcap':
+                            try:
+                                hematocrit = float(cands.iloc[0][f'blood_draw_hct{scan_index+1}'])/100
+                            except ValueError:
+                                raise Exception(f'There is no hct value in blood_draw_hct{scan_index+1} in REDCap')
+                            print(f'The study hematocrit I found is {hematocrit}')
+                    except NameError:
+                        pass
+                      
+                    try:
+                        if pt_type_num == 'redcap':
+                            the_num = cands.iloc[0]['case_control']
+                            if the_num == '0':
+                                pt_type_num = 0
+                                descrip = 'control'
+                            elif the_num == '1':
+                                pt_type_num = 1
+                                descrip = 'SCD'
+                            elif the_num == '2':
+                                pt_type_num = 1
+                                descrip = 'anemia'
+                            print(f'The patient type I found is {the_num} ({descrip})')
+                        print(f'The study id is {study_id}')
+                    except NameError:
+                        pass
+                    
+                    try:
+                        if art_ox_sat == 'redcap':
+                            try:
+                                art_ox_sat = float(cands.iloc[0][f'mr{scan_index+1}_pulse_ox_result'])/100
+                            except ValueError:
+                                raise Exception(f'There is no pulse ox (arterial ox sat) value in mr{scan_index+1}_pulse_ox_result in REDCap')
+                            print(f'The study pulse ox (arterial ox sat) I found is {art_ox_sat}')
+                    except NameError:
+                        pass
                     
                     time.sleep(3)
                     
@@ -606,7 +639,332 @@ if '3' in steps and name_in_redcap:
 elif '3' in steps and not name_in_redcap:
     print(f"\nSkipping Step 3: can't push to REDCap as either the mr_id is not in the database or the database could not be contacted")
     
+    
+if '4' in steps:
+    
+    print('\nStep 4: Generating PDF report\n')
+    
+    
+    now = datetime.datetime.now()
+    nowstr = now.strftime("%Y-%m-%d %H:%M")
+    
+    reporting_folder = os.path.join(in_folder, 'reporting')
+    
+    if os.path.exists(reporting_folder):
+        shutil.rmtree(reporting_folder)
+    
+    os.mkdir(reporting_folder)
+    
+    print('Pulling data from CSV')
+    
+    processed_csv = os.path.join(in_folder, f'{pt_id}_PROCESSINGresults.csv')
+    raw = open(processed_csv).readlines()
+    the_ln = raw[1].split(', ')
+    
+    filtered = ["".join(filter(str.isdigit, a)) for a in the_ln]
+    
+    numeric_filter = filter(str.isdigit, the_ln)
+    pld = filtered[1]
+    ld = filtered[2]
+    tr = filtered[3]
+    
+    
+    new_data = hp.parse_scd_csv(processed_csv, -1)
+    new_data = {key:float(val) for key,val in new_data.items()}
+    
+    mean_R2 = (new_data['mr0_relaxation_rate1'] + new_data['mr0_relaxation_rate2']) / 2
+    mean_T2 = (1/new_data['mr0_relaxation_rate1'] + 1/new_data['mr0_relaxation_rate2']) / 2
+    Ya = art_ox_sat
+    
+    bovine_Yv = (new_data['mr0_venous_oxygen_sat1'] + new_data['mr0_venous_oxygen_sat2']) / 2 / 100
+    aa_Yv = (new_data['mr0_aa_model_venous_oxygen_sat1'] + new_data['mr0_aa_model_venous_oxygen_sat2']) / 2 / 100
+    ss_Yv = (new_data['mr0_ss_model_venous_oxygen_sat1'] + new_data['mr0_ss_model_venous_oxygen_sat2']) / 2 / 100
+    f_Yv = (new_data['mr0_f_model_venous_oxygen_sat1'] + new_data['mr0_f_model_venous_oxygen_sat2']) / 2 / 100
+    
+    df_ox = pd.DataFrame()
+    df_ox['Model'] = ['Hb-Bovine', 'Hb-AA', 'Hb-SS', 'Hb-F']
+    df_ox['Yv'] = [bovine_Yv, aa_Yv, ss_Yv, f_Yv]
+    df_ox['OEF'] = [(Ya-Yv)/Ya for Yv in df_ox['Yv']]
+    
+    print('Generating and processing CBF images')
+    
+    mni_folder = os.path.join(in_folder, 'Processed', 'CBF2mm')
+    cbf_nii = os.path.join(mni_folder, f'{pt_id}_CBF_MNI_2mm.nii.gz')
+    cbf_im = os.path.join(reporting_folder, 'cbf.png')
+    
+    nii_image(cbf_nii, (3,3), cbf_im, cmap=matplotlib.cm.inferno, cmax=100, save=True, specified_frames=list(np.arange(12,72,7)), ax_font_size=16)
+    
+    
+    print('Generating decay plot')
+    
+    decay_csv = os.path.join(in_folder, f'decay_params.csv')
+    decay_df = pd.read_csv(decay_csv, header=None)
+    
+    trust_ete = decay_df.iloc[0]
+    trust_meansagsinus = decay_df.iloc[1]
+    trust_meansagsinus_one = decay_df.iloc[2][0]
+    trust_meanT2 = decay_df.iloc[2][1]
+    
+    
+    exes = np.arange(min(trust_ete),max(trust_ete),0.01)
+    exp_whys = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2);
+    
 
+    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+    decay_plot_path = os.path.join(reporting_folder, f'decay_plot.png')
+    
+    ax.plot(exes, exp_whys)
+    ax.scatter(trust_ete, trust_meansagsinus, color='black')
+    
+    ax.set_title('TRUST fit')
+    ax.set_xlabel('Relaxation time (ms)')
+    ax.set_ylabel('Signal (a.u.)')
+    
+    plt.tight_layout()
+    plt.savefig(decay_plot_path, dpi=200)
+    
+    
+    print('Assembling PDF')
+    pdf = FPDF()
+    ##### TITLE PAGE
+    pdf.add_page()
+    pdf.set_xy(0, 0)
+    pdf.set_font('arial', 'B', 16)
+    
+    vd_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/vandy_logo.jpg'
+    
+    
+    pdf.cell(210, 5, f"", 0, 2, 'C')
+    pdf.cell(210, 10, f"Scan report", 0, 2, 'C')
+    pdf.set_font('arial', 'B', 14)
+    pdf.cell(210, 8, f"T2-Relaxation-Under-Spin-Tagging (TRUST) and Arterial Spin Labeling (ASL)", 0, 2, 'C')
+    pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
+    
+    study_id = cands.iloc[0][f'mr{scan_index+1}_scan_id']
+    scan_date = cands.iloc[0][f'mr{scan_index+1}_dt']
+    gender = cands.iloc[0][f'gender']
+    if gender == '1':
+        gender_str = 'male'
+    elif gender == '0':
+        gender_str = 'female'
+    else:
+        gender_str = ''
+        
+    birth_date = cands.iloc[0][f'dob']
+    
+    format_str_scan = '%Y-%m-%d %H:%M'
+    format_str_birth = '%Y-%m-%d'
+    scan_dt_obj = datetime.datetime.strptime(scan_date, format_str_scan)
+    dob_dt_obj = datetime.datetime.strptime(birth_date, format_str_birth)
+    
+    pt_age = scan_dt_obj - dob_dt_obj
+    pt_age = round(pt_age.days/365.25, 1)
+    
+    
+    pdf.set_font('arial', 'B', 24)
+    pdf.cell(210/5, 10, f"", 0, 0, 'C')    
+    
+    # note that the_num indicates disease state
+    pdf.set_fill_color(130, 161, 255)
+    
+    ctrl_bold = scd_bold = anem_bold = ''
+    ctrl_fill = scd_fill = anem_fill = False
+    
+    if the_num == '0':
+        ctrl_bold = 'B'
+        ctrl_fill = True
+    elif the_num == '1':
+        scd_bold = 'B'
+        scd_fill = True
+    if the_num == '2':
+        anem_bold = 'B'
+        anem_fill = True
+    
+    pdf.set_font('arial', ctrl_bold, 24)
+    pdf.cell(210/5, 10, f"Control", 1, 0, 'C', fill=ctrl_fill)        
+    pdf.set_font('arial', scd_bold, 24)
+    pdf.cell(210/5, 10, f"SCD", 1, 0, 'C', fill=scd_fill)        
+    pdf.set_font('arial', anem_bold, 24)
+    pdf.cell(210/5, 10, f"Anemia", 1, 0, 'C', fill=anem_fill)   
+    
+    pdf.cell(210/5, 10, f"", 0, 2, 'C')    
+    pdf.cell(-(210/5)*4, 10, f"", 0, 0, 'C')
+    
+    pdf.set_font('arial', 'B', 20)
+    pdf.cell(210, 7, f"", 0, 2, 'C')
+    pdf.cell(210, 10, f"MR ID: {pt_id}", 0, 2, 'C')
+    pdf.cell(210, 10, f"Study ID: {study_id}", 0, 2, 'C')
+    #pdf.cell(210, 10, f"Status: {descrip}", 0, 2, 'C')
+    pdf.cell(210, 5, f"", 0, 2, 'C')
+    pdf.cell(210, 10, f"Age at scan: {pt_age}", 0, 2, 'C')
+    pdf.cell(210, 10, f"Gender: {gender_str}", 0, 2, 'C')
+    pdf.cell(210, 10, f"Hematocrit: {hematocrit}", 0, 2, 'C')
+    pdf.cell(210, 5, f"", 0, 2, 'C')
+    pdf.cell(210, 10, f"Scans acquired: {scan_date}", 0, 2, 'C')
+    pdf.cell(210, 10, f"Report generated: {nowstr}", 0, 2, 'C')
+    pdf.cell(210, 20, f"", 0, 2, 'C')
+    
+    
+    pdf.set_font('arial', 'B', 12)
+    pdf.cell(210/2, 8, f"TRUST Parameters", 0, 0, 'C')
+    pdf.cell(210/2, 8, f"ASL Parameters", 0, 2, 'C')
+    pdf.cell(-(210/2), 8, f"", 0, 0, 'C')
+    
+    
+    pdf.set_font('arial', '', 12)
+    pdf.set_text_color(133, 133, 133)
+    pdf.cell(210/2, 6, f"Spatial resolution: 2.875 x 2.875 x 5.0mm", 0, 0, 'C')
+    pdf.cell(210/2, 6, f"Spatial resolution: 3.0 x 3.0 x 8.0mm", 0, 2, 'C')
+    pdf.cell(-(210/2), 6, f"", 0, 0, 'C')
+    
+    pdf.cell(210/2, 6, f"Echo time range: [0, 40, 80, 160] ms", 0, 0, 'C')
+    pdf.cell(210/2, 6, f"PLD, LD, TR: {pld}ms, {ld}ms, {tr}s", 0, 2, 'C') 
+    
+    pdf.cell(210/2, 6, f"", 0, 0, 'C')
+    pdf.cell(210/2, 6, f"Labeling type: pCASL", 0, 2, 'C')
+    pdf.cell(-(210/2), 6, f"", 0, 0, 'C')
+    
+    
+    
+    pdf.set_text_color(133, 133, 133)
+    pdf.set_text_color(0, 0, 0)
+    ##### TRUST PAGE
+    pdf.add_page()
+    pdf.set_xy(0, 0)
+    pdf.set_font('arial', 'B', 12)    
+    pdf.set_text_color(133, 133, 133)
+    
+    pdf.cell(10)
+    pdf.cell(75, 5, f"", 0, 2, 'L')
+    pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
+    pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
+    pdf.cell(75, 5, f"Scans acquired: {scan_date}", 0, 2, 'L')
+    pdf.cell(75, 5, f"TRUST metrics", 0, 2, 'L')
+    pdf.cell(-10)
+    pdf.set_text_color(0, 0, 0)
+    
+    pdf.cell(60)
+    pdf.cell(90, 10, " ", 0, 2, 'C')
+    pdf.cell(-50)
+    pdf.set_font('arial', 'I', 12)
+    pdf.cell(50, 10, 'Mean T2 (s)', 1, 0, 'C')
+    pdf.set_font('arial', '', 12)
+    pdf.cell(50, 10, f'{round(mean_T2,3)}', 1, 2, 'C')
+    pdf.cell(-50)
+    pdf.set_font('arial', 'I', 12)
+    pdf.cell(50, 10, 'Mean R2 (1/s)', 1, 0, 'C')
+    pdf.set_font('arial', '', 12)
+    pdf.cell(50, 10, f'{np.round(mean_R2,decimals=2)}', 1, 2, 'C')
+    
+    pdf.cell(0, 5, '', 0, 1, 'C')
+    
+    pdf.set_font('arial', 'I', 12)
+    pdf.set_fill_color(255, 172, 166)
+    pdf.cell(170*Ya, 10, '', 0, 0, 'C', fill=True)
+    pdf.cell(-170*Ya, 10, '', 0, 0, 'C', fill=True)
+    pdf.cell(170, 10, f'Oxygenation modeling: arterial O2 saturation (Ya) = {round(Ya,2)}', 1, 2, 'C')
+    #pdf.cell(-100)
+    pdf.cell(50, 10, 'Model', 1, 0, 'C')
+    pdf.cell(60, 10, 'Venous O2 saturation (Yv)', 1, 0, 'C')
+    pdf.cell(60, 10, 'O2 extraction fraction (OEF)', 1, 2, 'C')
+    pdf.cell(-110)
+    pdf.set_font('arial', '', 12)
+    for i in range(0, len(df_ox)):
+        
+        Yv = df_ox['Yv'].iloc[i]
+        oef = df_ox['OEF'].iloc[i]
+        
+        pdf.cell(50, 10, '%s' % (df_ox['Model'].iloc[i]), 1, 0, 'C')
+        
+        pdf.set_fill_color(218, 212, 255)
+        pdf.cell(60*Yv, 10, ' ', 0, 0, 'L', fill=True)
+        pdf.cell(-60*Yv, 10, ' ', 0, 0, 'L', fill=False)
+        pdf.cell(60, 10, '%s' % (str(round(Yv,3))), 1, 0, 'C')
+        
+        pdf.set_fill_color(255, 240, 184)
+        pdf.cell(60*oef, 10, ' ', 0, 0, 'L', fill=True)
+        pdf.cell(-60*oef, 10, ' ', 0, 0, 'L', fill=False)
+        pdf.cell(60, 10, '%s' % (str(round(oef,3))), 1, 2, 'C')
+        
+        pdf.cell(-110)
+        
+    pdf.cell(0, 5, '', 0, 2, 'C')
+    pdf.cell(15)
+    pdf.image(decay_plot_path, x = None, y = None, w = 140, h = 0, type = '', link = '')
+    
+    
+    ##### CBF PAGE
+    pdf.add_page()
+    pdf.set_xy(0, 0)
+    pdf.set_font('arial', 'B', 12)      
+    pdf.set_text_color(133, 133, 133)
+    pdf.cell(10)
+    pdf.cell(75, 5, f"", 0, 2, 'L')
+    pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
+    pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
+    pdf.cell(75, 5, f"Scans acquired: {scan_date}", 0, 2, 'L')
+    pdf.cell(75, 5, f"ASL metrics", 0, 2, 'L')    
+    pdf.cell(-10)
+    pdf.set_text_color(0, 0, 0)
+        
+    pdf.cell(60)
+    pdf.cell(90, 10, " ", 0, 2, 'C')
+    pdf.cell(-35)
+    pdf.image(cbf_im, x = None, y = None, w = 160, h = 0, type = '', link = '')
+    pdf.set_font('arial', 'I', 12)
+    #pdf.cell(160, 10, 'Cerebral blood flow (ml/100g/min)', 0, 0, 'C')
+    
+    
+    pdf.cell(0, 5, '', 0, 1, 'C')
+    
+    
+    lobe_names = []
+    lobe_vals = []
+    i = 0
+    for key,val in new_data.items():
+        i += 1
+        name = ''
+        split = key.split('_')
+        if split[1][0] == 'l':
+            name = name+'Left'
+        elif split[1][0] == 'r':
+            name = name+'Right'
+            
+        name = name+' '+split[1][1:]
+        name = name+' '+split[2].upper()
+        
+        lobe_names.append(name)
+        lobe_vals.append(val)
+        
+        if i > 9:
+            break
+    
+
+    pdf.cell(40)
+    pdf.cell(50, 7, 'Lobe', 1, 0, 'C')
+    pdf.cell(60, 7, 'CBF (ml/100g/min)', 1, 2, 'C')
+    pdf.cell(-50)
+    pdf.set_font('arial', '', 12)
+    for i, (name,val) in enumerate(zip(lobe_names, lobe_vals)):
+        
+        pdf.cell(50, 7, '%s' % (name), 1, 0, 'C')
+        
+        gofrac = val / max(lobe_vals)
+        
+        pdf.set_fill_color(184, 255, 208)
+        pdf.cell(60*gofrac, 7, ' ', 0, 0, 'L', fill=True)
+        pdf.cell(-60*gofrac, 7, ' ', 0, 0, 'L', fill=False)
+        pdf.cell(60, 7, '%s' % (str(round(val,1))), 1, 2, 'C')
+        
+        pdf.cell(-50)
+    
+    
+    print('Writing PDF')
+    
+    pdf_out = os.path.join(reporting_folder, f'{pt_id}_report.pdf')
+    pdf.output(pdf_out, 'F')
+    
+    
     
 
     

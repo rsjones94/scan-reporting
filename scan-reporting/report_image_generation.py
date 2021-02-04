@@ -60,7 +60,7 @@ def filter_zeroed_axial_slices(nii_data, thresh=0.99):
         return the_data
 
 
-def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
+def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True, specified_frames=None, ax_font_size=32):
     """
     Produces a png representing multiple AXIAL slices of a NiFTI
 
@@ -121,8 +121,11 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         frames = np.arange(10,40,1)
     else:
         frames = np.arange(0,25,1)
+        
+    if specified_frames:
+        frames = specified_frames
     
-    
+    #print(f"FRAMES: {frames}")
     
     d0_l = [i for i in range(d0)]
     d1_l = [i for i in range(d1)]
@@ -179,6 +182,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         
     cmap.set_bad('black',1.)
     for (i,j), f in zip(subplots, frames):
+        #print(f'FRAMING: {f}')
         ax_slice = ndimage.rotate(data[:,:,f].T, 180)
         ax_slice[np.isclose(ax_slice,0)] = np.nan
         ax_slice[ax_slice < 0] = np.nan
@@ -187,7 +191,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True):
         ax[i][j].axis('off')
     
     
-    matplotlib.rcParams.update({'font.size': 32})
+    matplotlib.rcParams.update({'font.size': ax_font_size})
     plt.tight_layout(0.8)
     
     if cmap != matplotlib.cm.gray:

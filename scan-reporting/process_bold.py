@@ -230,7 +230,7 @@ if '2' in steps:
     os.chdir(processing_scripts_loc)
     processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master('{pt_id}','{asltype}',{dynamics},{pcaslBool})"'''
     
-    # print(processing_input)
+    print(f'Call to MATLAB: {processing_input}')
     
     subprocess.run(processing_input, check=True, shell=True)
     # subprocess.run('quit force', check=True, shell=True)
