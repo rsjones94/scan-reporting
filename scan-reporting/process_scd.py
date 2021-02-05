@@ -58,6 +58,7 @@ from helpers import get_terminal, str_time_elapsed
 import helpers as hp
 from report_image_generation import par2nii, nii_image
 
+
 wizard = """                
                   ....
                                 .'' .'''
@@ -672,6 +673,9 @@ if '4' in steps:
     new_data = hp.parse_scd_csv(processed_csv, -1)
     new_data = {key:float(val) for key,val in new_data.items()}
     
+    new_data_std = hp.parse_scd_csv(processed_csv, -1, std=True)
+    new_data_std = {key:float(val) for key,val in new_data_std.items()}
+    
     mean_R2 = (new_data['mr0_relaxation_rate1'] + new_data['mr0_relaxation_rate2']) / 2
     mean_T2 = (1/new_data['mr0_relaxation_rate1'] + 1/new_data['mr0_relaxation_rate2']) / 2
     Ya = art_ox_sat
@@ -701,20 +705,35 @@ if '4' in steps:
     decay_df = pd.read_csv(decay_csv, header=None)
     
     trust_ete = decay_df.iloc[0]
+    
     trust_meansagsinus = decay_df.iloc[1]
-    trust_meansagsinus_one = decay_df.iloc[2][0]
-    trust_meanT2 = decay_df.iloc[2][1]
+    
+    trust_meansagsinus_ci = decay_df.iloc[2] / 2 # the given limits are the total distance between the endpoints, but when we plot we're plotting the distance from the value (centerpoint)
+    
+    trust_meansagsinus_one = decay_df.iloc[3][0]
+    trust_meanT2 = decay_df.iloc[3][1]
+    trust_meanT2_max = decay_df.iloc[3][3]
+    trust_meanT2_min = decay_df.iloc[3][2]
+    
+    #decay_ci_csv = os.path.join(in_folder, f'fit_ci_params.csv')
+    #decay_ci_df= pd.read_csv(decay_ci_csv, header=None)
     
     
     exes = np.arange(min(trust_ete),max(trust_ete),0.01)
-    exp_whys = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2);
+    exp_whys = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2)
+    exp_upper = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_max)
+    exp_lower = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_min)
     
 
     fig, ax = plt.subplots(1, 1, figsize=(5, 5))
     decay_plot_path = os.path.join(reporting_folder, f'decay_plot.png')
     
-    ax.plot(exes, exp_whys)
-    ax.scatter(trust_ete, trust_meansagsinus, color='black')
+    ax.plot(exes, exp_whys, color='black') # fit
+    ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
+    ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
+    
+    
+    ax.errorbar(trust_ete, trust_meansagsinus, yerr=trust_meansagsinus_ci, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
     
     ax.set_title('TRUST fit')
     ax.set_xlabel('Relaxation time (ms)')
@@ -737,7 +756,9 @@ if '4' in steps:
     pdf.cell(210, 5, f"", 0, 2, 'C')
     pdf.cell(210, 10, f"Scan report", 0, 2, 'C')
     pdf.set_font('arial', 'B', 14)
-    pdf.cell(210, 8, f"T2-Relaxation-Under-Spin-Tagging (TRUST) and Arterial Spin Labeling (ASL)", 0, 2, 'C')
+    pdf.cell(210, 8, f"T2-Relaxation-Under-Spin-Tagging (TRUST) and Arterial Spin Labeling (ASL)", 0, 2, 'C')    
+    pdf.set_font('arial', '', 7)
+    pdf.cell(210, 6, f"Contact Dr. Manus Donahue (m.donahue@vumc.org) or Sky Jones (sky.jones@vumc.org) for questions regarding the generation of this report", 0, 2, 'C') 
     pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
     
     study_id = cands.iloc[0][f'mr{scan_index+1}_scan_id']
@@ -822,8 +843,10 @@ if '4' in steps:
     
     pdf.cell(210/2, 6, f"", 0, 0, 'C')
     pdf.cell(210/2, 6, f"Labeling type: pCASL", 0, 2, 'C')
-    pdf.cell(-(210/2), 6, f"", 0, 0, 'C')
+    pdf.cell(-(210), 6, f"", 0, 0, 'C')
     
+    #pdf.cell(0, 55, f"", 0, 2, 'C')
+
     
     
     pdf.set_text_color(133, 133, 133)
@@ -908,7 +931,7 @@ if '4' in steps:
     pdf.set_text_color(0, 0, 0)
         
     pdf.cell(60)
-    pdf.cell(90, 10, " ", 0, 2, 'C')
+    pdf.cell(90, 5, " ", 0, 2, 'C')
     pdf.cell(-35)
     pdf.image(cbf_im, x = None, y = None, w = 160, h = 0, type = '', link = '')
     pdf.set_font('arial', 'I', 12)
@@ -920,6 +943,7 @@ if '4' in steps:
     
     lobe_names = []
     lobe_vals = []
+    lobe_stds = []
     i = 0
     for key,val in new_data.items():
         i += 1
@@ -935,28 +959,37 @@ if '4' in steps:
         
         lobe_names.append(name)
         lobe_vals.append(val)
+        lobe_stds.append(new_data_std[key])
         
         if i > 9:
             break
     
 
-    pdf.cell(40)
+    pdf.cell(10)
     pdf.cell(50, 7, 'Lobe', 1, 0, 'C')
-    pdf.cell(60, 7, 'CBF (ml/100g/min)', 1, 2, 'C')
-    pdf.cell(-50)
+    pdf.cell(60, 7, 'CBF (ml/100g/min)', 1, 0, 'C')
+    pdf.cell(60, 7, 'Standard deviation', 1, 2, 'C')
+    pdf.cell(-110)
     pdf.set_font('arial', '', 12)
-    for i, (name,val) in enumerate(zip(lobe_names, lobe_vals)):
+    for i, (name,val,std) in enumerate(zip(lobe_names, lobe_vals, lobe_stds)):
         
         pdf.cell(50, 7, '%s' % (name), 1, 0, 'C')
         
         gofrac = val / max(lobe_vals)
+        gofrac_std = std / max(lobe_stds)
         
         pdf.set_fill_color(184, 255, 208)
         pdf.cell(60*gofrac, 7, ' ', 0, 0, 'L', fill=True)
         pdf.cell(-60*gofrac, 7, ' ', 0, 0, 'L', fill=False)
-        pdf.cell(60, 7, '%s' % (str(round(val,1))), 1, 2, 'C')
+        pdf.cell(60, 7, '%s' % (str(round(val,1))), 1, 0, 'C')
         
-        pdf.cell(-50)
+        
+        pdf.set_fill_color(255, 206, 133)
+        pdf.cell(60*gofrac_std, 7, ' ', 0, 0, 'L', fill=True)
+        pdf.cell(-60*gofrac_std, 7, ' ', 0, 0, 'L', fill=False)
+        pdf.cell(60, 7, '%s' % (str(round(std,1))), 1, 2, 'C')
+        
+        pdf.cell(-110)
     
     
     print('Writing PDF')

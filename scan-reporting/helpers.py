@@ -302,25 +302,50 @@ def most_common(L):
     return max(groups, key=_auxfun)[0]
 
 
-def parse_scd_csv(in_csv, scan_index):
+def parse_scd_csv(in_csv, scan_index, std=False):
+    """
+    
+    
+
+    Parameters
+    ----------
+    in_csv : TYPE
+        DESCRIPTION.
+    scan_index : TYPE
+        DESCRIPTION.
+    std : BOOL, optional
+        If False, then _cbf metrics are CBF. If True, then they are standard deviations. The default is False.
+
+    Returns
+    -------
+    parsed : TYPE
+        DESCRIPTION.
+
+    """
+    
+    if std:
+        row_add = 2
+        
+    else:
+        row_add = 0
     
     raw = open(in_csv).readlines()
     
     stripped_to_nums = [re.sub('[^0-9,.]', "", i).split(',') for i in raw] # regex to leave only numbers, commas and periodsd, then split by commas
     
     parsed = {
-                    f'mr{scan_index+1}_lparietal_gm_cbf':stripped_to_nums[15][0],
-                    f'mr{scan_index+1}_rparietal_gm_cbf':stripped_to_nums[15][1],
-                    f'mr{scan_index+1}_lfrontal_gm_cbf':stripped_to_nums[15][2],
-                    f'mr{scan_index+1}_rfrontal_gm_cbf':stripped_to_nums[15][3],
-                    f'mr{scan_index+1}_loccipital_gm_cbf':stripped_to_nums[15][4],
-                    f'mr{scan_index+1}_roccipital_gm_cbf':stripped_to_nums[15][5],
-                    f'mr{scan_index+1}_ltemporal_gm_cbf':stripped_to_nums[15][6],
-                    f'mr{scan_index+1}_rtemporal_gm_cbf':stripped_to_nums[15][7],
-                    f'mr{scan_index+1}_lcerebellum_gm_cbf':stripped_to_nums[15][8],
-                    f'mr{scan_index+1}_rcerebellum_gm_cbf':stripped_to_nums[15][9],
-                    f'mr{scan_index+1}_recalc_gm_cbf':stripped_to_nums[15][10],
-                    f'mr{scan_index+1}_recalc_wm_cbf':stripped_to_nums[15][11],
+                    f'mr{scan_index+1}_lparietal_gm_cbf':stripped_to_nums[15+row_add][0],
+                    f'mr{scan_index+1}_rparietal_gm_cbf':stripped_to_nums[15+row_add][1],
+                    f'mr{scan_index+1}_lfrontal_gm_cbf':stripped_to_nums[15+row_add][2],
+                    f'mr{scan_index+1}_rfrontal_gm_cbf':stripped_to_nums[15+row_add][3],
+                    f'mr{scan_index+1}_loccipital_gm_cbf':stripped_to_nums[15+row_add][4],
+                    f'mr{scan_index+1}_roccipital_gm_cbf':stripped_to_nums[15+row_add][5],
+                    f'mr{scan_index+1}_ltemporal_gm_cbf':stripped_to_nums[15+row_add][6],
+                    f'mr{scan_index+1}_rtemporal_gm_cbf':stripped_to_nums[15+row_add][7],
+                    f'mr{scan_index+1}_lcerebellum_gm_cbf':stripped_to_nums[15+row_add][8],
+                    f'mr{scan_index+1}_rcerebellum_gm_cbf':stripped_to_nums[15+row_add][9],
+                    f'mr{scan_index+1}_recalc_gm_cbf':stripped_to_nums[15+row_add][10],
+                    f'mr{scan_index+1}_recalc_wm_cbf':stripped_to_nums[15+row_add][11],
                     f'mr{scan_index+1}_white_cbv':stripped_to_nums[7][0],
                     f'mr{scan_index+1}_grey_cbv':stripped_to_nums[8][0],
                     f'mr{scan_index+1}_csf_cbv':stripped_to_nums[9][0],
