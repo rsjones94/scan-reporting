@@ -324,7 +324,7 @@ def parse_scd_csv(in_csv, scan_index, std=False):
     """
     
     if std:
-        row_add = 2
+        row_add = 3
         
     else:
         row_add = 0

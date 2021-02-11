@@ -22,19 +22,31 @@ input:
         to only go through step 2. Because there are only steps, multistep specification isn't really needed,
             but you can explicitly specify steps 1 and 2 by passing -s 12
     -h / --hct : the hematocrit as a float between 0 and 1. Required for step 2
-        you can also pass redcap as an argument, and the script will look for the hct value in REDCap and use that
+        you can also pass redcap as an argument, and the script will look for the hct value in REDCap and use that. default: redcap
     -f / --flip : optional. 1 to invert TRUST, 0 to leave as is (default=0).
         Note that the program will attempt to automatically invert the TRUST
         if needed, so only pass 1 if the results are still wrong
     -p / --pttype : the type of patient. 'sca', 'anemia' or 'control'. Required for step 2
-        note that 'sca' and 'anemia' trigger the same processing protocol
+        note that 'sca' and 'anemia' trigger the same processing protocol. default: redcap
         you can also pass redcap as an argument, and the script will look for the pt type value in REDCap and use that
     -e / --exclude: subprocessing steps to exclude. The subprocessing steps are
         TRUST (trust), volumetrics (vol) and ASL (asl). To exclude a step, or steps,
         enter the steps to exclude separated by a comma, e.g., -e vol,trust
     -a / --artox: the arterial oxygen saturation from the pulse oximeter, reported as a number between 0 and 1. Only required if generating the report (step 4)
+        Fetch from REDCap by passing redcap. default: redcap
+    -y / --auto: if 1, will skip some manual prompts and quality checks. 0 by default. Does not skip critical checks or unusual flags. Intended mostly
+        to allow DIPbot to run this program
+    -r / --redcap: if 1, will contact REDCap. if 0, will not. 1 by default
+        Obviously if you specify 0 for this but also specify things that require a REDCap connection (such as pulling parameters from REDCap
+        or pulling parameters from it) this will cause an error. This option is mostly here so data from outside the Donahue lab can
+        be procssed
+    -b / --dob: date of birth as YYYY.mm.dd
+    -u / -gender: any string, but typically male or female
+    -t / --scandate: the date of the scan as YYYY.mm.d
+    -x / --studyid: the study ID for the scan (eg., Jordan_1934848)
     -g / --help : brings up this helpful information. does not take an argument
 """
+#     -m / --mrid: the MR ID for the scan (e.g., PTSTEN_180)
 
 import os
 import sys
@@ -45,6 +57,7 @@ import datetime
 import glob
 import shutil
 import requests
+import re
 
 import redcap
 import pandas as pd
@@ -58,7 +71,7 @@ from helpers import get_terminal, str_time_elapsed
 import helpers as hp
 from report_image_generation import par2nii, nii_image
 
-
+#sys.exit()
 wizard = """                
                   ....
                                 .'' .'''
@@ -96,12 +109,29 @@ wizard = """
 
 inp = sys.argv
 bash_input = inp[1:]
-options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:a:g", ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl=', 'artox=', 'help'])
+options, remainder = getopt.getopt(bash_input, "i:n:s:h:f:p:e:a:y:r:b:u:t:x:g",
+                                   ["infolder=", "name=", 'steps=', 'hct=', 'flip=', 'pttype=', 'excl=', 'artox=', 'auto=', 'redcap=',
+                                    'dob=', 'gender=', 'scandate=', 'studyid=', 'help'])
 
 
 
 flip = 0
 asl_tr = 4
+auto = 0
+contact_redcap = 1
+
+art_ox_sat = 'redcap'
+hematocrit = 'redcap'
+pt_type_num = 'redcap'
+pt_type = 'redcap'
+
+scan_date = None
+birth_date = None
+gender = None
+
+mrid = None
+study_id = None
+
 
 do_run = {'trust':1,
           'vol':1,
@@ -113,6 +143,10 @@ for opt, arg in options:
         in_folder = arg
     elif opt in ('-n', '--name'):
         deidentify_name = arg
+    elif opt in ('-r', '--redcap'):
+        contact_redcap = int(arg)
+    elif opt in ('-y', '--auto'):
+        auto = int(arg)
     elif opt in ('-s', '--steps'):
         steps = arg
     elif opt in ('-h', '--hct'):
@@ -128,12 +162,20 @@ for opt, arg in options:
         pt_type = arg
         if pt_type == 'control':
             pt_type_num = 0
-        elif pt_type == 'sca' or pt_type == 'anemia':
+            the_num = '0'
+            descrip = 'control'
+        elif pt_type == 'sca':
             pt_type_num = 1
+            the_num = '1'
+            descrip = 'SCD'
+        elif pt_type == 'anemia':
+            pt_type_num = 1
+            the_num = '2'
+            descrip = 'anemia'
         elif pt_type == 'redcap':
             pt_type_num = pt_type
         else:
-            raise Exception('Patient type must be "sca" or "control"')
+            raise Exception('Patient type must be "sca", "control" or "anemia"')
     elif opt in ('-e', '--excl'):
         parsed_excl = arg.split(',')
         for p in parsed_excl:
@@ -150,6 +192,19 @@ for opt, arg in options:
                 raise Exception('Arterial oxygenation fraction must be between 0 and 1')
         else:
             art_ox_sat = arg
+
+    elif opt in ('-b', '--dob'):
+        birth_date = arg
+    elif opt in ('-u', '--gender'):
+        gender = arg
+    elif opt in ('-t', '--scandate'):
+        scan_date = arg
+    elif opt in ('-x', '--studyid'):
+        study_id = arg
+    """
+    elif opt in ('-m', '--mrid'):
+        steps = arg
+    """
 
 try:
     if steps == '0':
@@ -211,7 +266,11 @@ elif guess_ext in dcm_exts:
 elif guess_ext in nii_exts:
     has_ans = False
     while not has_ans:
-        ans = input(f'Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS.\nAlso note that volumetric calculations may be differ slightly from those obtained from the PARREC pipeline.\nPlease acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        if not auto:
+            ans = input(f'Input files seem to be NiFTI. ASL processing of NiFTIs is in an UNSTABLE BETA state.\nRESULTS MUST BE MANUALLY INSPECTED FOR CORRECTNESS.\nAlso note that volumetric calculations may be differ slightly from those obtained from the PARREC pipeline.\nPlease acknowledge this or cancel processing. [acknowledge/cancel]\n')
+        else:
+            ans = 'acknowledge'
+            print(f'Auto response: {ans}')
         if ans in ('acknowledge', 'cancel'):
             has_ans = True
             if ans == 'cancel':
@@ -228,124 +287,128 @@ else:
 original_wd = os.getcwd()
 pt_id = replacement = get_terminal(in_folder) # if the input folder is named correctly, it is the ID that will replace the pt name
 
-
-
-# check the redcap database to make sure the folder name is (pt_id) is in the redcap database
-
-print('\nContacting the REDCap database...')
-
-name_in_redcap = True
-
-try:
-    api_url = 'https://redcap.vanderbilt.edu/api/'
-    token_loc = '/Users/manusdonahue/Desktop/Projects/redcaptoken_scd_real.txt'
-    token = open(token_loc).read()
+name_in_redcap = False
+if contact_redcap:
+    # check the redcap database to make sure the folder name is (pt_id) is in the redcap database
     
-    project = redcap.Project(api_url, token)
-    project_data_raw = project.export_records()
-    project_data = pd.DataFrame(project_data_raw)
+    print('\nContacting the REDCap database...')
     
-    mri_cols = ['mr1_mr_id',
-                'mr2_mr_id',
-                'mr3_mr_id',
-                'mr4_mr_id',
-                'mr5_mr_id',
-                'mr6_mr_id'
-                ]
-
+    name_in_redcap = True
     
-    which_scan = [pt_id in list(project_data[i]) for i in mri_cols]
-    
-    if not any(which_scan):
-        has_ans = False
-        while not has_ans:
-            print(f'The mr_id ({pt_id}) was not found in the REDCap database')
-            print("You can still process this data, but you won't be able to push the results to REDCap automatically, and I won't be able to find the patient's hct.")
-            ans = input('Is this okay? [y/n]\n')
-            if ans in ('y','n'):
-                has_ans = True
-                if ans == 'n':
-                    raise Exception('Aborting processing')
-                elif ans == 'y':
-                    print(f'Continuing with processing. Remember to fix the discrepancy between the local and REDCap mr_id values.')
-                    if 'redcap' in [hematocrit, pt_type_num]:
-                        raise Exception('Cannot use pull hct or pt type from REDCap without a database connection')
-                    time.sleep(3)
-                    name_in_redcap = False
-            else:
-                print('Answer must be "y" or "n"')
-    else:
-        if sum(which_scan) > 1:
-            raise Exception(f'The patient id ({pt_id}) appears in more than one mr_id column in the REDCap database\n{[(i,j) for i,j in zip(mri_cols, which_scan)]}\nPlease correct the database')
+    try:
+        api_url = 'https://redcap.vanderbilt.edu/api/'
+        token_loc = '/Users/manusdonahue/Desktop/Projects/redcaptoken_scd_real.txt'
+        token = open(token_loc).read()
         
-        has_ans = False
-        while not has_ans:
-            print(f"MR ID {pt_id} appears to correspond to scan number {which_scan.index(True)+1} for this patient")
-            print(f'(the mr_id was found in column {mri_cols[which_scan.index(True)]})')
-            ans = input(f'Please confirm that this is correct, especially if you intend to push processing results to REDCap or are using the database values for hct/pt type. [y/n]\n')
-            if ans in ('y','n'):
-                has_ans = True
-                if ans == 'n':
-                    raise Exception('Aborting processing')
-                elif ans == 'y':
-                    scan_index = which_scan.index(True)
-                    scan_mr_col = mri_cols[scan_index]
-                    studyid_index_data = project_data.set_index('study_id')
-                    
-                    inds = studyid_index_data[scan_mr_col] == pt_id
-                    cands = studyid_index_data[inds]
-                    
-                    if len(cands) != 1:
-                        raise Exception(f'There are {len(cands)} mr_id candidates in the database. There must be exactly one')
-                    
-                    study_id = cands.index[0]
-                    
-                    try:
-                        if hematocrit == 'redcap':
-                            try:
-                                hematocrit = float(cands.iloc[0][f'blood_draw_hct{scan_index+1}'])/100
-                            except ValueError:
-                                raise Exception(f'There is no hct value in blood_draw_hct{scan_index+1} in REDCap')
-                            print(f'The study hematocrit I found is {hematocrit}')
-                    except NameError:
-                        pass
-                      
-                    try:
-                        if pt_type_num == 'redcap':
-                            the_num = cands.iloc[0]['case_control']
-                            if the_num == '0':
-                                pt_type_num = 0
-                                descrip = 'control'
-                            elif the_num == '1':
-                                pt_type_num = 1
-                                descrip = 'SCD'
-                            elif the_num == '2':
-                                pt_type_num = 1
-                                descrip = 'anemia'
-                            print(f'The patient type I found is {the_num} ({descrip})')
-                        print(f'The study id is {study_id}')
-                    except NameError:
-                        pass
-                    
-                    try:
-                        if art_ox_sat == 'redcap':
-                            try:
-                                art_ox_sat = float(cands.iloc[0][f'mr{scan_index+1}_pulse_ox_result'])/100
-                            except ValueError:
-                                raise Exception(f'There is no pulse ox (arterial ox sat) value in mr{scan_index+1}_pulse_ox_result in REDCap')
-                            print(f'The study pulse ox (arterial ox sat) I found is {art_ox_sat}')
-                    except NameError:
-                        pass
-                    
-                    time.sleep(3)
-                    
-            else:
-                print('Answer must be "y" or "n"')
-except requests.exceptions.RequestException:
-    print(f"Could not make contact with the REDCap database. You won't be able to push data to REDCap automatically")
-    print("This is usually due to lack of internet connection or REDCap being down")
-    name_in_redcap = False
-    time.sleep(3)
+        project = redcap.Project(api_url, token)
+        project_data_raw = project.export_records()
+        project_data = pd.DataFrame(project_data_raw)
+        
+        mri_cols = ['mr1_mr_id',
+                    'mr2_mr_id',
+                    'mr3_mr_id',
+                    'mr4_mr_id',
+                    'mr5_mr_id',
+                    'mr6_mr_id'
+                    ]
+    
+        
+        which_scan = [pt_id in list(project_data[i]) for i in mri_cols]
+        
+        if not any(which_scan):
+            has_ans = False
+            while not has_ans:
+                print(f'The mr_id ({pt_id}) was not found in the REDCap database')
+                print("You can still process this data, but you won't be able to push the results to REDCap automatically, and I won't be able to find the patient's hct.")
+                ans = input('Is this okay? [y/n]\n')
+                if ans in ('y','n'):
+                    has_ans = True
+                    if ans == 'n':
+                        raise Exception('Aborting processing')
+                    elif ans == 'y':
+                        print(f'Continuing with processing. Remember to fix the discrepancy between the local and REDCap mr_id values.')
+                        if 'redcap' in [hematocrit, pt_type_num]:
+                            raise Exception('Cannot use pull hct or pt type from REDCap without a database connection')
+                        time.sleep(3)
+                        name_in_redcap = False
+                else:
+                    print('Answer must be "y" or "n"')
+        else:
+            if sum(which_scan) > 1:
+                raise Exception(f'The patient id ({pt_id}) appears in more than one mr_id column in the REDCap database\n{[(i,j) for i,j in zip(mri_cols, which_scan)]}\nPlease correct the database')
+            
+            has_ans = False
+            while not has_ans:
+                print(f"MR ID {pt_id} appears to correspond to scan number {which_scan.index(True)+1} for this patient")
+                print(f'(the mr_id was found in column {mri_cols[which_scan.index(True)]})')
+                if not auto:
+                    ans = input(f'Please confirm that this is correct, especially if you intend to push processing results to REDCap or are using the database values for hct/pt type. [y/n]\n')
+                else:
+                    ans = 'y'
+                    print(f'Auto response: {ans}')
+                if ans in ('y','n'):
+                    has_ans = True
+                    if ans == 'n':
+                        raise Exception('Aborting processing')
+                    elif ans == 'y':
+                        scan_index = which_scan.index(True)
+                        scan_mr_col = mri_cols[scan_index]
+                        studyid_index_data = project_data.set_index('study_id')
+                        
+                        inds = studyid_index_data[scan_mr_col] == pt_id
+                        cands = studyid_index_data[inds]
+                        
+                        if len(cands) != 1:
+                            raise Exception(f'There are {len(cands)} mr_id candidates in the database. There must be exactly one')
+                        
+                        study_id = cands.index[0]
+                        
+                        try:
+                            if hematocrit == 'redcap':
+                                try:
+                                    hematocrit = float(cands.iloc[0][f'blood_draw_hct{scan_index+1}'])/100
+                                except ValueError:
+                                    raise Exception(f'There is no hct value in blood_draw_hct{scan_index+1} in REDCap')
+                                print(f'The study hematocrit I found is {hematocrit}')
+                        except NameError:
+                            pass
+                          
+                        try:
+                            if pt_type_num == 'redcap':
+                                the_num = cands.iloc[0]['case_control']
+                                if the_num == '0':
+                                    pt_type_num = 0
+                                    descrip = 'control'
+                                elif the_num == '1':
+                                    pt_type_num = 1
+                                    descrip = 'SCD'
+                                elif the_num == '2':
+                                    pt_type_num = 1
+                                    descrip = 'anemia'
+                                print(f'The patient type I found is {the_num} ({descrip})')
+                            print(f'The study id is {study_id}')
+                        except NameError:
+                            pass
+                        
+                        try:
+                            if art_ox_sat == 'redcap':
+                                try:
+                                    art_ox_sat = float(cands.iloc[0][f'mr{scan_index+1}_pulse_ox_result'])/100
+                                except ValueError:
+                                    raise Exception(f'There is no pulse ox (arterial ox sat) value in mr{scan_index+1}_pulse_ox_result in REDCap')
+                                print(f'The study pulse ox (arterial ox sat) I found is {art_ox_sat}')
+                        except NameError:
+                            pass
+                        
+                        time.sleep(3)
+                        
+                else:
+                    print('Answer must be "y" or "n"')
+    except requests.exceptions.RequestException:
+        print(f"Could not make contact with the REDCap database. You won't be able to push data to REDCap automatically")
+        print("This is usually due to lack of internet connection or REDCap being down")
+        name_in_redcap = False
+        time.sleep(3)
 
 if '1' in steps:
     ##### step 1 : deidentification
@@ -458,7 +521,11 @@ if '2' in steps:
         
     has_ans = False
     while not has_ans:
-        ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {tr}\nIs this okay? (y/n/show)\n')
+        if not auto:
+            ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {tr}\nIs this okay? (y/n/show)\n')
+        else:
+            ans = 'y'
+            print(f'Auto response: {ans}')
         if ans == 'y':
             has_ans = True
             asl_pld = pld
@@ -543,7 +610,7 @@ if '2' in steps:
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
     os.chdir(processing_scripts_loc)
-    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type_num},{flip},{asl_tr},{asl_pld},{asl_ld},{do_run['trust']},{do_run['vol']},{do_run['asl']})"'''
+    processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type_num},{flip},{asl_tr},{asl_pld},{asl_ld},{do_run['trust']},{do_run['vol']},{do_run['asl']},{auto})"'''
     
     print(f'Call to MATLAB: {processing_input}')
     
@@ -662,9 +729,13 @@ if '4' in steps:
     raw = open(processed_csv).readlines()
     the_ln = raw[1].split(', ')
     
-    filtered = ["".join(filter(str.isdigit, a)) for a in the_ln]
+    non_decimal = re.compile(r'[^\d.]+')
     
-    numeric_filter = filter(str.isdigit, the_ln)
+    filtered = [non_decimal.sub('', a) for a in the_ln]
+    #non_decimal.sub(the_ln, '12.34fe4e')
+    
+    #filtered = ["".join(filter(str.isdigit, a)) for a in the_ln]
+    
     pld = filtered[1]
     ld = filtered[2]
     tr = filtered[3]
@@ -736,7 +807,7 @@ if '4' in steps:
     ax.errorbar(trust_ete, trust_meansagsinus, yerr=trust_meansagsinus_ci, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
     
     ax.set_title('TRUST fit')
-    ax.set_xlabel('Relaxation time (ms)')
+    ax.set_xlabel('Effective echo time (ms)')
     ax.set_ylabel('Signal (a.u.)')
     
     plt.tight_layout()
@@ -761,25 +832,40 @@ if '4' in steps:
     pdf.cell(210, 6, f"Contact Dr. Manus Donahue (m.donahue@vumc.org) or Sky Jones (sky.jones@vumc.org) for questions regarding the generation of this report", 0, 2, 'C') 
     pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
     
-    study_id = cands.iloc[0][f'mr{scan_index+1}_scan_id']
-    scan_date = cands.iloc[0][f'mr{scan_index+1}_dt']
-    gender = cands.iloc[0][f'gender']
+    if contact_redcap:
+        study_id = cands.iloc[0][f'mr{scan_index+1}_scan_id']
+        scan_date = cands.iloc[0][f'mr{scan_index+1}_dt']
+        gender = cands.iloc[0][f'gender']
+        birth_date = cands.iloc[0][f'dob']
+        
     if gender == '1':
         gender_str = 'male'
     elif gender == '0':
         gender_str = 'female'
     else:
-        gender_str = ''
+        gender_str = gender
         
-    birth_date = cands.iloc[0][f'dob']
+    if contact_redcap:
+        format_str_scan = '%Y-%m-%d %H:%M'
+        format_str_birth = '%Y-%m-%d'
+    else:
+        format_str_scan = '%Y.%m.%d'
+        format_str_birth = '%Y.%m.%d'
     
-    format_str_scan = '%Y-%m-%d %H:%M'
-    format_str_birth = '%Y-%m-%d'
-    scan_dt_obj = datetime.datetime.strptime(scan_date, format_str_scan)
-    dob_dt_obj = datetime.datetime.strptime(birth_date, format_str_birth)
+    try:
+        scan_dt_obj = datetime.datetime.strptime(scan_date, format_str_scan)
+    except TypeError:
+        pass
+    try:
+        dob_dt_obj = datetime.datetime.strptime(birth_date, format_str_birth)
+    except TypeError:
+        pass
     
-    pt_age = scan_dt_obj - dob_dt_obj
-    pt_age = round(pt_age.days/365.25, 1)
+    try:
+        pt_age = scan_dt_obj - dob_dt_obj
+        pt_age = round(pt_age.days/365.25, 1)
+    except NameError:
+        pt_age = None
     
     
     pdf.set_font('arial', 'B', 24)
@@ -791,6 +877,7 @@ if '4' in steps:
     ctrl_bold = scd_bold = anem_bold = ''
     ctrl_fill = scd_fill = anem_fill = False
     
+
     if the_num == '0':
         ctrl_bold = 'B'
         ctrl_fill = True
@@ -821,7 +908,7 @@ if '4' in steps:
     pdf.cell(210, 10, f"Gender: {gender_str}", 0, 2, 'C')
     pdf.cell(210, 10, f"Hematocrit: {hematocrit}", 0, 2, 'C')
     pdf.cell(210, 5, f"", 0, 2, 'C')
-    pdf.cell(210, 10, f"Scans acquired: {scan_date}", 0, 2, 'C')
+    pdf.cell(210, 10, f"Scan acquisition date: {scan_date}", 0, 2, 'C')
     pdf.cell(210, 10, f"Report generated: {nowstr}", 0, 2, 'C')
     pdf.cell(210, 20, f"", 0, 2, 'C')
     
