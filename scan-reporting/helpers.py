@@ -14,6 +14,7 @@ import itertools
 import operator
 import re
 
+import numpy as np
 from pptx import Presentation
 from pptx.util import Inches
 import pandas as pd
@@ -331,24 +332,29 @@ def parse_scd_csv(in_csv, scan_index, std=False):
     
     raw = open(in_csv).readlines()
     
-    stripped_to_nums = [re.sub('[^0-9,.]', "", i).split(',') for i in raw] # regex to leave only numbers, commas and periodsd, then split by commas
+    stripped_to_nums = [re.sub('[^0-9,.-]', "", i).split(',') for i in raw] # regex to leave only numbers, commas, periods and dashes, then split by commas
+    
+    for i, big_list in enumerate(stripped_to_nums):
+        for j, sub in enumerate(big_list):
+            if sub == '-999':
+                stripped_to_nums[i][j] = np.nan
     
     parsed = {
-                    f'mr{scan_index+1}_lparietal_gm_cbf':stripped_to_nums[15+row_add][0],
-                    f'mr{scan_index+1}_rparietal_gm_cbf':stripped_to_nums[15+row_add][1],
-                    f'mr{scan_index+1}_lfrontal_gm_cbf':stripped_to_nums[15+row_add][2],
-                    f'mr{scan_index+1}_rfrontal_gm_cbf':stripped_to_nums[15+row_add][3],
-                    f'mr{scan_index+1}_loccipital_gm_cbf':stripped_to_nums[15+row_add][4],
-                    f'mr{scan_index+1}_roccipital_gm_cbf':stripped_to_nums[15+row_add][5],
-                    f'mr{scan_index+1}_ltemporal_gm_cbf':stripped_to_nums[15+row_add][6],
-                    f'mr{scan_index+1}_rtemporal_gm_cbf':stripped_to_nums[15+row_add][7],
-                    f'mr{scan_index+1}_lcerebellum_gm_cbf':stripped_to_nums[15+row_add][8],
-                    f'mr{scan_index+1}_rcerebellum_gm_cbf':stripped_to_nums[15+row_add][9],
-                    f'mr{scan_index+1}_recalc_gm_cbf':stripped_to_nums[15+row_add][10],
-                    f'mr{scan_index+1}_recalc_wm_cbf':stripped_to_nums[15+row_add][11],
-                    f'mr{scan_index+1}_white_cbv':stripped_to_nums[7][0],
-                    f'mr{scan_index+1}_grey_cbv':stripped_to_nums[8][0],
-                    f'mr{scan_index+1}_csf_cbv':stripped_to_nums[9][0],
+                    f'mr{scan_index+1}_lparietal_gm_cbf':str(stripped_to_nums[15+row_add][0]),
+                    f'mr{scan_index+1}_rparietal_gm_cbf':str(stripped_to_nums[15+row_add][1]),
+                    f'mr{scan_index+1}_lfrontal_gm_cbf':str(stripped_to_nums[15+row_add][2]),
+                    f'mr{scan_index+1}_rfrontal_gm_cbf':str(stripped_to_nums[15+row_add][3]),
+                    f'mr{scan_index+1}_loccipital_gm_cbf':str(stripped_to_nums[15+row_add][4]),
+                    f'mr{scan_index+1}_roccipital_gm_cbf':str(stripped_to_nums[15+row_add][5]),
+                    f'mr{scan_index+1}_ltemporal_gm_cbf':str(stripped_to_nums[15+row_add][6]),
+                    f'mr{scan_index+1}_rtemporal_gm_cbf':str(stripped_to_nums[15+row_add][7]),
+                    f'mr{scan_index+1}_lcerebellum_gm_cbf':str(stripped_to_nums[15+row_add][8]),
+                    f'mr{scan_index+1}_rcerebellum_gm_cbf':str(stripped_to_nums[15+row_add][9]),
+                    f'mr{scan_index+1}_recalc_gm_cbf':str(stripped_to_nums[15+row_add][10]),
+                    f'mr{scan_index+1}_recalc_wm_cbf':str(stripped_to_nums[15+row_add][11]),
+                    f'mr{scan_index+1}_white_cbv':str(stripped_to_nums[7][0]),
+                    f'mr{scan_index+1}_grey_cbv':str(stripped_to_nums[8][0]),
+                    f'mr{scan_index+1}_csf_cbv':str(stripped_to_nums[9][0]),
                     f'mr{scan_index+1}_relaxation_rate1':str(1/float(stripped_to_nums[2][1])),
                     f'mr{scan_index+1}_relaxation_rate2':str(1/float(stripped_to_nums[2][3])),
                     f'mr{scan_index+1}_venous_oxygen_sat1':str(float(stripped_to_nums[3][1])*100), #bovine

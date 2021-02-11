@@ -521,8 +521,9 @@ if '2' in steps:
         
     has_ans = False
     while not has_ans:
+        print(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {tr}\nIs this okay? (y/n/show)\n')
         if not auto:
-            ans = input(f'\nFound asl_pld: {pld}\nFound asl_ld: {ld}\nFound asl_tr: {tr}\nIs this okay? (y/n/show)\n')
+            ans = input()
         else:
             ans = 'y'
             print(f'Auto response: {ans}')
@@ -671,7 +672,7 @@ if '3' in steps and name_in_redcap:
         
     has_ans = False
     while not has_ans:
-        ans = input(f'\nPush to database? Note that these results will not be correct if processing (asl+vol+TRUST) is not complete. [y/n/wipe]\n')
+        ans = input(f'\nPush to database? Note that a nan will not overwrite the database entry. This behavior may or may not be desired. [y/n/wipe (DO NOT USE WIPE)]\n')
         if ans in ('y','n','wipe'):
             has_ans = True
             if ans == 'n':
@@ -691,7 +692,9 @@ if '3' in steps and name_in_redcap:
                     
                 print(f'\nData import complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
             elif ans =='wipe':
-                print('Wiping REDCap entries for this scan - this takes about a minute (AND DOES NOT ACTUALLY WORK)')
+                print('BRO I SAID DO NOT')
+                sys.exit()
+                print('Wiping REDCap entries for this scan - this takes about a minute')
                 project = redcap.Project(api_url, token) # we need to pull a fresh copy of the database in case someone else had been modifying it during processing
                 project_data_raw = project.export_records()
                 project_data = pd.DataFrame(project_data_raw)
@@ -761,57 +764,9 @@ if '4' in steps:
     df_ox['Yv'] = [bovine_Yv, aa_Yv, ss_Yv, f_Yv]
     df_ox['OEF'] = [(Ya-Yv)/Ya for Yv in df_ox['Yv']]
     
-    print('Generating and processing CBF images')
-    
-    mni_folder = os.path.join(in_folder, 'Processed', 'CBF2mm')
-    cbf_nii = os.path.join(mni_folder, f'{pt_id}_CBF_MNI_2mm.nii.gz')
-    cbf_im = os.path.join(reporting_folder, 'cbf.png')
-    
-    nii_image(cbf_nii, (3,3), cbf_im, cmap=matplotlib.cm.inferno, cmax=100, save=True, specified_frames=list(np.arange(12,72,7)), ax_font_size=16)
     
     
-    print('Generating decay plot')
     
-    decay_csv = os.path.join(in_folder, f'decay_params.csv')
-    decay_df = pd.read_csv(decay_csv, header=None)
-    
-    trust_ete = decay_df.iloc[0]
-    
-    trust_meansagsinus = decay_df.iloc[1]
-    
-    trust_meansagsinus_ci = decay_df.iloc[2] / 2 # the given limits are the total distance between the endpoints, but when we plot we're plotting the distance from the value (centerpoint)
-    
-    trust_meansagsinus_one = decay_df.iloc[3][0]
-    trust_meanT2 = decay_df.iloc[3][1]
-    trust_meanT2_max = decay_df.iloc[3][3]
-    trust_meanT2_min = decay_df.iloc[3][2]
-    
-    #decay_ci_csv = os.path.join(in_folder, f'fit_ci_params.csv')
-    #decay_ci_df= pd.read_csv(decay_ci_csv, header=None)
-    
-    
-    exes = np.arange(min(trust_ete),max(trust_ete),0.01)
-    exp_whys = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2)
-    exp_upper = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_max)
-    exp_lower = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_min)
-    
-
-    fig, ax = plt.subplots(1, 1, figsize=(5, 5))
-    decay_plot_path = os.path.join(reporting_folder, f'decay_plot.png')
-    
-    ax.plot(exes, exp_whys, color='black') # fit
-    ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
-    ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
-    
-    
-    ax.errorbar(trust_ete, trust_meansagsinus, yerr=trust_meansagsinus_ci, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
-    
-    ax.set_title('TRUST fit')
-    ax.set_xlabel('Effective echo time (ms)')
-    ax.set_ylabel('Signal (a.u.)')
-    
-    plt.tight_layout()
-    plt.savefig(decay_plot_path, dpi=200)
     
     
     print('Assembling PDF')
@@ -827,7 +782,15 @@ if '4' in steps:
     pdf.cell(210, 5, f"", 0, 2, 'C')
     pdf.cell(210, 10, f"Scan report", 0, 2, 'C')
     pdf.set_font('arial', 'B', 14)
-    pdf.cell(210, 8, f"T2-Relaxation-Under-Spin-Tagging (TRUST) and Arterial Spin Labeling (ASL)", 0, 2, 'C')    
+    
+    if do_run['asl'] and do_run['vol']:
+        header_text = 'Arterial Spin Labeling (ASL)'    
+    if do_run['trust']:
+        header_text = 'T2-Relaxation-Under-Spin-Tagging (TRUST)'    
+    if do_run['asl'] and do_run['vol'] and do_run['trust']:
+        header_text = 'T2-Relaxation-Under-Spin-Tagging (TRUST) and Arterial Spin Labeling (ASL)'
+    
+    pdf.cell(210, 8, header_text, 0, 2, 'C')    
     pdf.set_font('arial', '', 7)
     pdf.cell(210, 6, f"Contact Dr. Manus Donahue (m.donahue@vumc.org) or Sky Jones (sky.jones@vumc.org) for questions regarding the generation of this report", 0, 2, 'C') 
     pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
@@ -854,8 +817,9 @@ if '4' in steps:
     
     try:
         scan_dt_obj = datetime.datetime.strptime(scan_date, format_str_scan)
+        scan_date_printer = scan_dt_obj.strftime('%Y-%m-%d')
     except TypeError:
-        pass
+        scan_date_printer = None
     try:
         dob_dt_obj = datetime.datetime.strptime(birth_date, format_str_birth)
     except TypeError:
@@ -908,7 +872,7 @@ if '4' in steps:
     pdf.cell(210, 10, f"Gender: {gender_str}", 0, 2, 'C')
     pdf.cell(210, 10, f"Hematocrit: {hematocrit}", 0, 2, 'C')
     pdf.cell(210, 5, f"", 0, 2, 'C')
-    pdf.cell(210, 10, f"Scan acquisition date: {scan_date}", 0, 2, 'C')
+    pdf.cell(210, 10, f"Acquisition date: {scan_date_printer}", 0, 2, 'C')
     pdf.cell(210, 10, f"Report generated: {nowstr}", 0, 2, 'C')
     pdf.cell(210, 20, f"", 0, 2, 'C')
     
@@ -938,145 +902,198 @@ if '4' in steps:
     
     pdf.set_text_color(133, 133, 133)
     pdf.set_text_color(0, 0, 0)
-    ##### TRUST PAGE
-    pdf.add_page()
-    pdf.set_xy(0, 0)
-    pdf.set_font('arial', 'B', 12)    
-    pdf.set_text_color(133, 133, 133)
     
-    pdf.cell(10)
-    pdf.cell(75, 5, f"", 0, 2, 'L')
-    pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
-    pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
-    pdf.cell(75, 5, f"Scans acquired: {scan_date}", 0, 2, 'L')
-    pdf.cell(75, 5, f"TRUST metrics", 0, 2, 'L')
-    pdf.cell(-10)
-    pdf.set_text_color(0, 0, 0)
+    if do_run['trust']:
     
-    pdf.cell(60)
-    pdf.cell(90, 10, " ", 0, 2, 'C')
-    pdf.cell(-50)
-    pdf.set_font('arial', 'I', 12)
-    pdf.cell(50, 10, 'Mean T2 (s)', 1, 0, 'C')
-    pdf.set_font('arial', '', 12)
-    pdf.cell(50, 10, f'{round(mean_T2,3)}', 1, 2, 'C')
-    pdf.cell(-50)
-    pdf.set_font('arial', 'I', 12)
-    pdf.cell(50, 10, 'Mean R2 (1/s)', 1, 0, 'C')
-    pdf.set_font('arial', '', 12)
-    pdf.cell(50, 10, f'{np.round(mean_R2,decimals=2)}', 1, 2, 'C')
+        print('Generating decay plot')
+        
+        decay_csv = os.path.join(in_folder, f'decay_params.csv')
+        decay_df = pd.read_csv(decay_csv, header=None)
+        
+        trust_ete = decay_df.iloc[0]
+        
+        trust_meansagsinus = decay_df.iloc[1]
+        
+        trust_meansagsinus_ci = decay_df.iloc[2] / 2 # the given limits are the total distance between the endpoints, but when we plot we're plotting the distance from the value (centerpoint)
+        
+        trust_meansagsinus_one = decay_df.iloc[3][0]
+        trust_meanT2 = decay_df.iloc[3][1]
+        trust_meanT2_max = decay_df.iloc[3][3]
+        trust_meanT2_min = decay_df.iloc[3][2]
+        
+        #decay_ci_csv = os.path.join(in_folder, f'fit_ci_params.csv')
+        #decay_ci_df= pd.read_csv(decay_ci_csv, header=None)
+        
+        
+        exes = np.arange(min(trust_ete),max(trust_ete),0.01)
+        exp_whys = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2)
+        exp_upper = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_max)
+        exp_lower = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_min)
+        
     
-    pdf.cell(0, 5, '', 0, 1, 'C')
-    
-    pdf.set_font('arial', 'I', 12)
-    pdf.set_fill_color(255, 172, 166)
-    pdf.cell(170*Ya, 10, '', 0, 0, 'C', fill=True)
-    pdf.cell(-170*Ya, 10, '', 0, 0, 'C', fill=True)
-    pdf.cell(170, 10, f'Oxygenation modeling: arterial O2 saturation (Ya) = {round(Ya,2)}', 1, 2, 'C')
-    #pdf.cell(-100)
-    pdf.cell(50, 10, 'Model', 1, 0, 'C')
-    pdf.cell(60, 10, 'Venous O2 saturation (Yv)', 1, 0, 'C')
-    pdf.cell(60, 10, 'O2 extraction fraction (OEF)', 1, 2, 'C')
-    pdf.cell(-110)
-    pdf.set_font('arial', '', 12)
-    for i in range(0, len(df_ox)):
+        fig, ax = plt.subplots(1, 1, figsize=(5, 5))
+        decay_plot_path = os.path.join(reporting_folder, f'decay_plot.png')
         
-        Yv = df_ox['Yv'].iloc[i]
-        oef = df_ox['OEF'].iloc[i]
+        ax.plot(exes, exp_whys, color='black') # fit
+        ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
+        ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
         
-        pdf.cell(50, 10, '%s' % (df_ox['Model'].iloc[i]), 1, 0, 'C')
         
-        pdf.set_fill_color(218, 212, 255)
-        pdf.cell(60*Yv, 10, ' ', 0, 0, 'L', fill=True)
-        pdf.cell(-60*Yv, 10, ' ', 0, 0, 'L', fill=False)
-        pdf.cell(60, 10, '%s' % (str(round(Yv,3))), 1, 0, 'C')
+        ax.errorbar(trust_ete, trust_meansagsinus, yerr=trust_meansagsinus_ci, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
         
-        pdf.set_fill_color(255, 240, 184)
-        pdf.cell(60*oef, 10, ' ', 0, 0, 'L', fill=True)
-        pdf.cell(-60*oef, 10, ' ', 0, 0, 'L', fill=False)
-        pdf.cell(60, 10, '%s' % (str(round(oef,3))), 1, 2, 'C')
+        ax.set_title('TRUST fit')
+        ax.set_xlabel('Effective echo time (ms)')
+        ax.set_ylabel('Signal (a.u.)')
         
+        plt.tight_layout()
+        plt.savefig(decay_plot_path, dpi=200)
+        
+        ##### TRUST PAGE
+        pdf.add_page()
+        pdf.set_xy(0, 0)
+        pdf.set_font('arial', 'B', 12)    
+        pdf.set_text_color(133, 133, 133)
+        
+        pdf.cell(10)
+        pdf.cell(75, 5, f"", 0, 2, 'L')
+        pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
+        pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
+        pdf.cell(75, 5, f"Acquisition date: {scan_date_printer}", 0, 2, 'L')
+        pdf.cell(75, 5, f"TRUST metrics", 0, 2, 'L')
+        pdf.cell(-10)
+        pdf.set_text_color(0, 0, 0)
+        
+        pdf.cell(60)
+        pdf.cell(90, 10, " ", 0, 2, 'C')
+        pdf.cell(-50)
+        pdf.set_font('arial', 'I', 12)
+        pdf.cell(50, 10, 'Mean T2 (s)', 1, 0, 'C')
+        pdf.set_font('arial', '', 12)
+        pdf.cell(50, 10, f'{round(mean_T2,3)}', 1, 2, 'C')
+        pdf.cell(-50)
+        pdf.set_font('arial', 'I', 12)
+        pdf.cell(50, 10, 'Mean R2 (1/s)', 1, 0, 'C')
+        pdf.set_font('arial', '', 12)
+        pdf.cell(50, 10, f'{np.round(mean_R2,decimals=2)}', 1, 2, 'C')
+        
+        pdf.cell(0, 5, '', 0, 1, 'C')
+        
+        pdf.set_font('arial', 'I', 12)
+        pdf.set_fill_color(255, 172, 166)
+        pdf.cell(170*Ya, 10, '', 0, 0, 'C', fill=True)
+        pdf.cell(-170*Ya, 10, '', 0, 0, 'C', fill=True)
+        pdf.cell(170, 10, f'Oxygenation modeling: arterial O2 saturation (Ya) = {round(Ya,2)}', 1, 2, 'C')
+        #pdf.cell(-100)
+        pdf.cell(50, 10, 'Model', 1, 0, 'C')
+        pdf.cell(60, 10, 'Venous O2 saturation (Yv)', 1, 0, 'C')
+        pdf.cell(60, 10, 'O2 extraction fraction (OEF)', 1, 2, 'C')
         pdf.cell(-110)
-        
-    pdf.cell(0, 5, '', 0, 2, 'C')
-    pdf.cell(15)
-    pdf.image(decay_plot_path, x = None, y = None, w = 140, h = 0, type = '', link = '')
-    
-    
-    ##### CBF PAGE
-    pdf.add_page()
-    pdf.set_xy(0, 0)
-    pdf.set_font('arial', 'B', 12)      
-    pdf.set_text_color(133, 133, 133)
-    pdf.cell(10)
-    pdf.cell(75, 5, f"", 0, 2, 'L')
-    pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
-    pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
-    pdf.cell(75, 5, f"Scans acquired: {scan_date}", 0, 2, 'L')
-    pdf.cell(75, 5, f"ASL metrics", 0, 2, 'L')    
-    pdf.cell(-10)
-    pdf.set_text_color(0, 0, 0)
-        
-    pdf.cell(60)
-    pdf.cell(90, 5, " ", 0, 2, 'C')
-    pdf.cell(-35)
-    pdf.image(cbf_im, x = None, y = None, w = 160, h = 0, type = '', link = '')
-    pdf.set_font('arial', 'I', 12)
-    #pdf.cell(160, 10, 'Cerebral blood flow (ml/100g/min)', 0, 0, 'C')
-    
-    
-    pdf.cell(0, 5, '', 0, 1, 'C')
-    
-    
-    lobe_names = []
-    lobe_vals = []
-    lobe_stds = []
-    i = 0
-    for key,val in new_data.items():
-        i += 1
-        name = ''
-        split = key.split('_')
-        if split[1][0] == 'l':
-            name = name+'Left'
-        elif split[1][0] == 'r':
-            name = name+'Right'
+        pdf.set_font('arial', '', 12)
+        for i in range(0, len(df_ox)):
             
-        name = name+' '+split[1][1:]
-        name = name+' '+split[2].upper()
-        
-        lobe_names.append(name)
-        lobe_vals.append(val)
-        lobe_stds.append(new_data_std[key])
-        
-        if i > 9:
-            break
+            Yv = df_ox['Yv'].iloc[i]
+            oef = df_ox['OEF'].iloc[i]
+            
+            pdf.cell(50, 10, '%s' % (df_ox['Model'].iloc[i]), 1, 0, 'C')
+            
+            pdf.set_fill_color(218, 212, 255)
+            pdf.cell(60*Yv, 10, ' ', 0, 0, 'L', fill=True)
+            pdf.cell(-60*Yv, 10, ' ', 0, 0, 'L', fill=False)
+            pdf.cell(60, 10, '%s' % (str(round(Yv,3))), 1, 0, 'C')
+            
+            pdf.set_fill_color(255, 240, 184)
+            pdf.cell(60*oef, 10, ' ', 0, 0, 'L', fill=True)
+            pdf.cell(-60*oef, 10, ' ', 0, 0, 'L', fill=False)
+            pdf.cell(60, 10, '%s' % (str(round(oef,3))), 1, 2, 'C')
+            
+            pdf.cell(-110)
+            
+        pdf.cell(0, 5, '', 0, 2, 'C')
+        pdf.cell(15)
+        pdf.image(decay_plot_path, x = None, y = None, w = 140, h = 0, type = '', link = '')
     
-
-    pdf.cell(10)
-    pdf.cell(50, 7, 'Lobe', 1, 0, 'C')
-    pdf.cell(60, 7, 'CBF (ml/100g/min)', 1, 0, 'C')
-    pdf.cell(60, 7, 'Standard deviation', 1, 2, 'C')
-    pdf.cell(-110)
-    pdf.set_font('arial', '', 12)
-    for i, (name,val,std) in enumerate(zip(lobe_names, lobe_vals, lobe_stds)):
+    if do_run['asl'] and do_run['vol']:
+        print('Generating and processing CBF images')
+    
+        mni_folder = os.path.join(in_folder, 'Processed', 'CBF2mm')
+        cbf_nii = os.path.join(mni_folder, f'{pt_id}_CBF_MNI_2mm.nii.gz')
+        cbf_im = os.path.join(reporting_folder, 'cbf.png')
         
-        pdf.cell(50, 7, '%s' % (name), 1, 0, 'C')
+        nii_image(cbf_nii, (3,3), cbf_im, cmap=matplotlib.cm.inferno, cmax=100, save=True, specified_frames=list(np.arange(12,72,7)), ax_font_size=16)
+        ##### CBF PAGE
+        pdf.add_page()
+        pdf.set_xy(0, 0)
+        pdf.set_font('arial', 'B', 12)      
+        pdf.set_text_color(133, 133, 133)
+        pdf.cell(10)
+        pdf.cell(75, 5, f"", 0, 2, 'L')
+        pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
+        pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
+        pdf.cell(75, 5, f"Acquisition date: {scan_date_printer}", 0, 2, 'L')
+        pdf.cell(75, 5, f"ASL metrics", 0, 2, 'L')    
+        pdf.cell(-10)
+        pdf.set_text_color(0, 0, 0)
+            
+        pdf.cell(60)
+        pdf.cell(90, 5, " ", 0, 2, 'C')
+        pdf.cell(-35)
+        pdf.image(cbf_im, x = None, y = None, w = 160, h = 0, type = '', link = '')
+        pdf.set_font('arial', 'I', 12)
+        #pdf.cell(160, 10, 'Cerebral blood flow (ml/100g/min)', 0, 0, 'C')
         
-        gofrac = val / max(lobe_vals)
-        gofrac_std = std / max(lobe_stds)
         
-        pdf.set_fill_color(184, 255, 208)
-        pdf.cell(60*gofrac, 7, ' ', 0, 0, 'L', fill=True)
-        pdf.cell(-60*gofrac, 7, ' ', 0, 0, 'L', fill=False)
-        pdf.cell(60, 7, '%s' % (str(round(val,1))), 1, 0, 'C')
+        pdf.cell(0, 5, '', 0, 1, 'C')
         
         
-        pdf.set_fill_color(255, 206, 133)
-        pdf.cell(60*gofrac_std, 7, ' ', 0, 0, 'L', fill=True)
-        pdf.cell(-60*gofrac_std, 7, ' ', 0, 0, 'L', fill=False)
-        pdf.cell(60, 7, '%s' % (str(round(std,1))), 1, 2, 'C')
+        lobe_names = []
+        lobe_vals = []
+        lobe_stds = []
+        i = 0
+        for key,val in new_data.items():
+            i += 1
+            name = ''
+            split = key.split('_')
+            if split[1][0] == 'l':
+                name = name+'Left'
+            elif split[1][0] == 'r':
+                name = name+'Right'
+                
+            name = name+' '+split[1][1:]
+            name = name+' '+split[2].upper()
+            
+            lobe_names.append(name)
+            lobe_vals.append(val)
+            lobe_stds.append(new_data_std[key])
+            
+            if i > 9:
+                break
         
+    
+        pdf.cell(10)
+        pdf.cell(50, 7, 'Lobe', 1, 0, 'C')
+        pdf.cell(60, 7, 'CBF (ml/100g/min)', 1, 0, 'C')
+        pdf.cell(60, 7, 'Standard deviation', 1, 2, 'C')
         pdf.cell(-110)
+        pdf.set_font('arial', '', 12)
+        for i, (name,val,std) in enumerate(zip(lobe_names, lobe_vals, lobe_stds)):
+            
+            pdf.cell(50, 7, '%s' % (name), 1, 0, 'C')
+            
+            gofrac = val / max(lobe_vals)
+            gofrac_std = std / max(lobe_stds)
+            
+            pdf.set_fill_color(184, 255, 208)
+            pdf.cell(60*gofrac, 7, ' ', 0, 0, 'L', fill=True)
+            pdf.cell(-60*gofrac, 7, ' ', 0, 0, 'L', fill=False)
+            pdf.cell(60, 7, '%s' % (str(round(val,1))), 1, 0, 'C')
+            
+            
+            pdf.set_fill_color(255, 206, 133)
+            pdf.cell(60*gofrac_std, 7, ' ', 0, 0, 'L', fill=True)
+            pdf.cell(-60*gofrac_std, 7, ' ', 0, 0, 'L', fill=False)
+            pdf.cell(60, 7, '%s' % (str(round(std,1))), 1, 2, 'C')
+            
+            pdf.cell(-110)
     
     
     print('Writing PDF')
