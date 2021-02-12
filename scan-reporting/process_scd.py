@@ -777,6 +777,7 @@ if '4' in steps:
     pdf.set_font('arial', 'B', 16)
     
     vd_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/vandy_logo.jpg'
+    vumc_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/vumc_logo_clear.png'
     
     
     pdf.cell(210, 5, f"", 0, 2, 'C')
@@ -793,7 +794,23 @@ if '4' in steps:
     pdf.cell(210, 8, header_text, 0, 2, 'C')    
     pdf.set_font('arial', '', 7)
     pdf.cell(210, 6, f"Contact Dr. Manus Donahue (m.donahue@vumc.org) or Sky Jones (sky.jones@vumc.org) for questions regarding the generation of this report", 0, 2, 'C') 
-    pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
+    pdf.ln()
+    pdf.ln()
+    pdf.ln()
+    pdf.ln()
+    pdf.ln()
+    #pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
+    
+    pdf.image(vumc_logo, x = None, y = None, w = 191, h = 0, type = '', link = '')
+    
+    pdf.ln()
+    pdf.ln()
+    pdf.ln()
+    pdf.ln()
+    pdf.ln()
+    
+    
+    pdf.cell(-10, 0, '', 0, 0, 'C')
     
     if contact_redcap:
         study_id = cands.iloc[0][f'mr{scan_index+1}_scan_id']
