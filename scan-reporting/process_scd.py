@@ -139,7 +139,7 @@ do_run = {'trust':1,
           }
 
 for opt, arg in options:
-    if opt in ('-i', '--infile'):
+    if opt in ('-i', '--infolder'):
         in_folder = arg
     elif opt in ('-n', '--name'):
         deidentify_name = arg
@@ -611,6 +611,17 @@ if '2' in steps:
     
     processing_scripts_loc = r'/Users/manusdonahue/Desktop/Projects/SCD/Processing/Pipeline/'
     os.chdir(processing_scripts_loc)
+    
+    if '4' in steps and do_run['trust']:
+        assert art_ox_sat != 'redcap'
+        
+    if do_run['trust']:
+        assert hematocrit != 'redcap'
+    elif hematocrit == 'redcap':
+        hematocrit = 0 #fine to pass junk in for hct if not running TRUST
+        
+    assert pt_type_num != 'redcap'
+    
     processing_input = f'''/Applications/MATLAB_R2016b.app/bin/matlab -nodesktop -nosplash -r "Master_v2('{pt_id}',{hematocrit},{pt_type_num},{flip},{asl_tr},{asl_pld},{asl_ld},{do_run['trust']},{do_run['vol']},{do_run['asl']},{auto})"'''
     
     print(f'Call to MATLAB: {processing_input}')
@@ -715,6 +726,9 @@ if '4' in steps:
     
     print('\nStep 4: Generating PDF report\n')
     
+    if hematocrit == 'redcap':
+        hematocrit = None
+    
     
     now = datetime.datetime.now()
     nowstr = now.strftime("%Y-%m-%d %H:%M")
@@ -762,7 +776,11 @@ if '4' in steps:
     df_ox = pd.DataFrame()
     df_ox['Model'] = ['Hb-Bovine', 'Hb-AA', 'Hb-SS', 'Hb-F']
     df_ox['Yv'] = [bovine_Yv, aa_Yv, ss_Yv, f_Yv]
-    df_ox['OEF'] = [(Ya-Yv)/Ya for Yv in df_ox['Yv']]
+    
+    if do_run['trust']:
+        df_ox['OEF'] = [(Ya-Yv)/Ya for Yv in df_ox['Yv']]
+    else:
+        df_ox['OEF'] = [np.nan for Yv in df_ox['Yv']]
     
     
     
@@ -868,6 +886,12 @@ if '4' in steps:
     if the_num == '2':
         anem_bold = 'B'
         anem_fill = True
+        
+    
+        
+    use_pt_id = pt_id
+    bot_append = 'PROCESSING_BOT_'
+    use_pt_id = use_pt_id.replace(bot_append,'')
     
     pdf.set_font('arial', ctrl_bold, 24)
     pdf.cell(210/5, 10, f"Control", 1, 0, 'C', fill=ctrl_fill)        
@@ -881,7 +905,7 @@ if '4' in steps:
     
     pdf.set_font('arial', 'B', 20)
     pdf.cell(210, 7, f"", 0, 2, 'C')
-    pdf.cell(210, 10, f"MR ID: {pt_id}", 0, 2, 'C')
+    pdf.cell(210, 10, f"MR ID: {use_pt_id}", 0, 2, 'C')
     pdf.cell(210, 10, f"Study ID: {study_id}", 0, 2, 'C')
     #pdf.cell(210, 10, f"Status: {descrip}", 0, 2, 'C')
     pdf.cell(210, 5, f"", 0, 2, 'C')
@@ -973,7 +997,7 @@ if '4' in steps:
         
         pdf.cell(10)
         pdf.cell(75, 5, f"", 0, 2, 'L')
-        pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
+        pdf.cell(75, 5, f"MR ID: {use_pt_id}", 0, 2, 'L')
         pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
         pdf.cell(75, 5, f"Acquisition date: {scan_date_printer}", 0, 2, 'L')
         pdf.cell(75, 5, f"TRUST metrics", 0, 2, 'L')
@@ -1044,7 +1068,7 @@ if '4' in steps:
         pdf.set_text_color(133, 133, 133)
         pdf.cell(10)
         pdf.cell(75, 5, f"", 0, 2, 'L')
-        pdf.cell(75, 5, f"MR ID: {pt_id}", 0, 2, 'L')
+        pdf.cell(75, 5, f"MR ID: {use_pt_id}", 0, 2, 'L')
         pdf.cell(75, 5, f"Status: {descrip}", 0, 2, 'L')
         pdf.cell(75, 5, f"Acquisition date: {scan_date_printer}", 0, 2, 'L')
         pdf.cell(75, 5, f"ASL metrics", 0, 2, 'L')    
@@ -1115,7 +1139,7 @@ if '4' in steps:
     
     print('Writing PDF')
     
-    pdf_out = os.path.join(reporting_folder, f'{pt_id}_report.pdf')
+    pdf_out = os.path.join(reporting_folder, f'{use_pt_id}_report.pdf')
     pdf.output(pdf_out, 'F')
     
     
