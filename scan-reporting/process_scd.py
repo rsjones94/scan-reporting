@@ -468,7 +468,11 @@ if '2' in steps:
 
         has_ans = False
         while not has_ans:
-            ans = input(f'\nWould you like to proceed anyway? [y/n]\n')
+            if not auto:
+                ans = input(f'\nWould you like to proceed anyway? [y/n]\n')
+            else:
+                ans = 'y'
+                print(f'Auto response: {ans}')
             if ans in ('y','n'):
                 has_ans = True
                 if ans == 'n':
@@ -794,7 +798,8 @@ if '4' in steps:
     pdf.set_xy(0, 0)
     pdf.set_font('arial', 'B', 16)
     
-    vd_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/vandy_logo.jpg'
+    donahue_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/Donahue_Lab_v1.png'
+    #donahue_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/Donahue_Lab_v1_vec.svg'
     vumc_logo = '/Users/manusdonahue/Documents/Sky/repositories/scan-reporting/bin/vumc_logo_clear.png'
     
     
@@ -814,16 +819,16 @@ if '4' in steps:
     pdf.cell(210, 6, f"Contact Dr. Manus Donahue (m.donahue@vumc.org) or Sky Jones (sky.jones@vumc.org) for questions regarding the generation of this report", 0, 2, 'C') 
     pdf.ln()
     pdf.ln()
-    pdf.ln()
-    pdf.ln()
-    pdf.ln()
     #pdf.image(vd_logo, x = None, y = None, w = 205, h = 0, type = '', link = '')
     
     pdf.image(vumc_logo, x = None, y = None, w = 191, h = 0, type = '', link = '')
     
     pdf.ln()
     pdf.ln()
-    pdf.ln()
+    
+    pdf.cell(20, 5, f"", 0, 0, 'C')
+    pdf.image(donahue_logo, x = None, y = None, w = 151, h = 0, type = '', link = '')
+    
     pdf.ln()
     pdf.ln()
     
@@ -893,49 +898,49 @@ if '4' in steps:
     bot_append = 'PROCESSING_BOT_'
     use_pt_id = use_pt_id.replace(bot_append,'')
     
-    pdf.set_font('arial', ctrl_bold, 24)
+    pdf.set_font('arial', ctrl_bold, 22)
     pdf.cell(210/5, 10, f"Control", 1, 0, 'C', fill=ctrl_fill)        
-    pdf.set_font('arial', scd_bold, 24)
+    pdf.set_font('arial', scd_bold, 22)
     pdf.cell(210/5, 10, f"SCD", 1, 0, 'C', fill=scd_fill)        
-    pdf.set_font('arial', anem_bold, 24)
+    pdf.set_font('arial', anem_bold, 22)
     pdf.cell(210/5, 10, f"Anemia", 1, 0, 'C', fill=anem_fill)   
     
     pdf.cell(210/5, 10, f"", 0, 2, 'C')    
     pdf.cell(-(210/5)*4, 10, f"", 0, 0, 'C')
     
     pdf.set_font('arial', 'B', 20)
-    pdf.cell(210, 7, f"", 0, 2, 'C')
-    pdf.cell(210, 10, f"MR ID: {use_pt_id}", 0, 2, 'C')
-    pdf.cell(210, 10, f"Study ID: {study_id}", 0, 2, 'C')
+    pdf.cell(210, 8, f"", 0, 2, 'C')
+    pdf.cell(210, 8, f"MR ID: {use_pt_id}", 0, 2, 'C')
+    pdf.cell(210, 8, f"Study ID: {study_id}", 0, 2, 'C')
     #pdf.cell(210, 10, f"Status: {descrip}", 0, 2, 'C')
     pdf.cell(210, 5, f"", 0, 2, 'C')
-    pdf.cell(210, 10, f"Age at scan: {pt_age}", 0, 2, 'C')
-    pdf.cell(210, 10, f"Gender: {gender_str}", 0, 2, 'C')
-    pdf.cell(210, 10, f"Hematocrit: {hematocrit}", 0, 2, 'C')
+    pdf.cell(210, 8, f"Age at scan: {pt_age}", 0, 2, 'C')
+    pdf.cell(210, 8, f"Gender: {gender_str}", 0, 2, 'C')
+    pdf.cell(210, 8, f"Hematocrit: {hematocrit}", 0, 2, 'C')
     pdf.cell(210, 5, f"", 0, 2, 'C')
-    pdf.cell(210, 10, f"Acquisition date: {scan_date_printer}", 0, 2, 'C')
-    pdf.cell(210, 10, f"Report generated: {nowstr}", 0, 2, 'C')
-    pdf.cell(210, 20, f"", 0, 2, 'C')
+    pdf.cell(210, 8, f"Acquisition date: {scan_date_printer}", 0, 2, 'C')
+    pdf.cell(210, 8, f"Report generated: {nowstr}", 0, 2, 'C')
+    pdf.cell(210, 8, f"", 0, 2, 'C')
     
     
-    pdf.set_font('arial', 'B', 12)
-    pdf.cell(210/2, 8, f"TRUST Parameters", 0, 0, 'C')
-    pdf.cell(210/2, 8, f"ASL Parameters", 0, 2, 'C')
-    pdf.cell(-(210/2), 8, f"", 0, 0, 'C')
-    
-    
-    pdf.set_font('arial', '', 12)
-    pdf.set_text_color(133, 133, 133)
-    pdf.cell(210/2, 6, f"Spatial resolution: 2.875 x 2.875 x 5.0mm", 0, 0, 'C')
-    pdf.cell(210/2, 6, f"Spatial resolution: 3.0 x 3.0 x 8.0mm", 0, 2, 'C')
+    pdf.set_font('arial', 'B', 10)
+    pdf.cell(210/2, 6, f"TRUST Parameters", 0, 0, 'C')
+    pdf.cell(210/2, 6, f"ASL Parameters", 0, 2, 'C')
     pdf.cell(-(210/2), 6, f"", 0, 0, 'C')
     
-    pdf.cell(210/2, 6, f"Echo time range: [0, 40, 80, 160] ms", 0, 0, 'C')
-    pdf.cell(210/2, 6, f"PLD, LD, TR: {pld}ms, {ld}ms, {tr}s", 0, 2, 'C') 
     
-    pdf.cell(210/2, 6, f"", 0, 0, 'C')
-    pdf.cell(210/2, 6, f"Labeling type: pCASL", 0, 2, 'C')
-    pdf.cell(-(210), 6, f"", 0, 0, 'C')
+    pdf.set_font('arial', '', 8)
+    pdf.set_text_color(133, 133, 133)
+    pdf.cell(210/2, 4, f"Spatial resolution: 2.875 x 2.875 x 5.0mm", 0, 0, 'C')
+    pdf.cell(210/2, 4, f"Spatial resolution: 3.0 x 3.0 x 8.0mm", 0, 2, 'C')
+    pdf.cell(-(210/2), 4, f"", 0, 0, 'C')
+    
+    pdf.cell(210/2, 4, f"Echo time range: [0, 40, 80, 160] ms", 0, 0, 'C')
+    pdf.cell(210/2, 4, f"PLD, LD, TR: {pld}ms, {ld}ms, {tr}s", 0, 2, 'C') 
+    
+    pdf.cell(210/2, 4, f"", 0, 0, 'C')
+    pdf.cell(210/2, 4, f"Labeling type: pCASL", 0, 2, 'C')
+    pdf.cell(-(210), 4, f"", 0, 0, 'C')
     
     #pdf.cell(0, 55, f"", 0, 2, 'C')
 
