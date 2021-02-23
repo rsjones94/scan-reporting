@@ -981,8 +981,8 @@ if '4' in steps:
         decay_plot_path = os.path.join(reporting_folder, f'decay_plot.png')
         
         ax.plot(exes, exp_whys, color='black') # fit
-        ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
-        ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
+        #ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
+        #ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
         
         
         ax.errorbar(trust_ete, trust_meansagsinus, yerr=trust_meansagsinus_ci, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
