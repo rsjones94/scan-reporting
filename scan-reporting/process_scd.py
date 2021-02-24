@@ -163,7 +163,7 @@ for opt, arg in options:
         if pt_type == 'control':
             pt_type_num = 0
             the_num = '0'
-            descrip = 'control'
+            descrip = 'non-anemic'
         elif pt_type == 'sca':
             pt_type_num = 1
             the_num = '1'
@@ -378,7 +378,7 @@ if contact_redcap:
                                 the_num = cands.iloc[0]['case_control']
                                 if the_num == '0':
                                     pt_type_num = 0
-                                    descrip = 'control'
+                                    descrip = 'non-anemic'
                                 elif the_num == '1':
                                     pt_type_num = 1
                                     descrip = 'SCD'
@@ -872,8 +872,7 @@ if '4' in steps:
         pt_age = None
     
     
-    pdf.set_font('arial', 'B', 24)
-    pdf.cell(210/5, 10, f"", 0, 0, 'C')    
+   
     
     # note that the_num indicates disease state
     pdf.set_fill_color(130, 161, 255)
@@ -892,21 +891,23 @@ if '4' in steps:
         anem_bold = 'B'
         anem_fill = True
         
-    
+    pdf.set_font('arial', 'B', 24)
+    pdf.cell(210/8, 10, f"", 0, 0, 'C') 
         
     use_pt_id = pt_id
     bot_append = 'PROCESSING_BOT_'
     use_pt_id = use_pt_id.replace(bot_append,'')
     
     pdf.set_font('arial', ctrl_bold, 22)
-    pdf.cell(210/5, 10, f"Control", 1, 0, 'C', fill=ctrl_fill)        
+    pdf.cell(210/4, 10, f"Non-anemic", 1, 0, 'C', fill=ctrl_fill)        
     pdf.set_font('arial', scd_bold, 22)
-    pdf.cell(210/5, 10, f"SCD", 1, 0, 'C', fill=scd_fill)        
+    pdf.cell(210/4, 10, f"SCD", 1, 0, 'C', fill=scd_fill)        
     pdf.set_font('arial', anem_bold, 22)
-    pdf.cell(210/5, 10, f"Anemia", 1, 0, 'C', fill=anem_fill)   
+    pdf.cell(210/4, 10, f"Anemia", 1, 0, 'C', fill=anem_fill)   
     
-    pdf.cell(210/5, 10, f"", 0, 2, 'C')    
-    pdf.cell(-(210/5)*4, 10, f"", 0, 0, 'C')
+    pdf.cell(210/8, 10, f"", 0, 2, 'C')  
+    
+    pdf.cell(-(210/8)*7, 10, f"", 0, 0, 'C')
     
     pdf.set_font('arial', 'B', 20)
     pdf.cell(210, 8, f"", 0, 2, 'C')
