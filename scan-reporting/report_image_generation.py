@@ -60,6 +60,10 @@ def filter_zeroed_axial_slices(nii_data, thresh=0.99):
         return the_data
 
 
+def side_by_side_nii_image(niis, n_rows, cmaps, cmaxes=None, save=True, specified_frames=None, ax_font_size=32):
+    pass
+
+
 def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True, specified_frames=None, ax_font_size=32):
     """
     Produces a png representing multiple AXIAL slices of a NiFTI

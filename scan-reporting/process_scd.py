@@ -40,10 +40,10 @@ input:
         Obviously if you specify 0 for this but also specify things that require a REDCap connection (such as pulling parameters from REDCap
         or pulling parameters from it) this will cause an error. This option is mostly here so data from outside the Donahue lab can
         be procssed
-    -b / --dob: date of birth as YYYY.mm.dd
-    -u / -gender: any string, but typically male or female
-    -t / --scandate: the date of the scan as YYYY.mm.d
-    -x / --studyid: the study ID for the scan (eg., Jordan_1934848)
+    -b / --dob: date of birth as YYYY.mm.dd. If redcap is contacted, the redcap value takes precedence
+    -u / -gender: any string, but typically male or female. If redcap is contacted, the redcap value takes precedence
+    -t / --scandate: the date of the scan as YYYY.mm.dd. If redcap is contacted, the redcap value takes precedence
+    -x / --studyid: the study ID for the scan (eg., Jordan_1934848). If redcap is contacted, the redcap value takes precedence
     -g / --help : brings up this helpful information. does not take an argument
 """
 #     -m / --mrid: the MR ID for the scan (e.g., PTSTEN_180)
@@ -702,8 +702,8 @@ if '3' in steps and name_in_redcap:
                 
                 for key, val in new_data.items():
                     studyid_index_data.loc[study_id][key] = val
-                np = project.import_records(studyid_index_data)
-                print(f'REDCap data import message: {np}')
+                np_out = project.import_records(studyid_index_data)
+                print(f'REDCap data import message: {np_out}')
                     
                 print(f'\nData import complete. Elapsed time: {str_time_elapsed(start_stamp)} minutes')
             elif ans =='wipe':
@@ -717,8 +717,8 @@ if '3' in steps and name_in_redcap:
                 
                 for key, val in new_data.items():
                     studyid_index_data.loc[study_id][key] = ''
-                np = project.import_records(studyid_index_data)
-                print(f'REDCap data import message: {np}')
+                np_out = project.import_records(studyid_index_data)
+                print(f'REDCap data import message: {np_out}')
         else:
             print('Answer must be "y", "n" or "wipe" (which will clear the displayed fields for this scan)')
     
@@ -961,12 +961,13 @@ if '4' in steps:
         
         trust_meansagsinus = decay_df.iloc[1]
         
-        trust_meansagsinus_ci = decay_df.iloc[2] / 2 # the given limits are the total distance between the endpoints, but when we plot we're plotting the distance from the value (centerpoint)
+        trust_meansagsinus_MAX = decay_df.iloc[2]
+        trust_meansagsinus_MIN = decay_df.iloc[3]
         
-        trust_meansagsinus_one = decay_df.iloc[3][0]
-        trust_meanT2 = decay_df.iloc[3][1]
-        trust_meanT2_max = decay_df.iloc[3][3]
-        trust_meanT2_min = decay_df.iloc[3][2]
+        trust_meansagsinus_one = decay_df.iloc[4][0]
+        trust_meanT2 = decay_df.iloc[4][1]
+        trust_meanT2_max = decay_df.iloc[4][3]
+        trust_meanT2_min = decay_df.iloc[4][2]
         
         #decay_ci_csv = os.path.join(in_folder, f'fit_ci_params.csv')
         #decay_ci_df= pd.read_csv(decay_ci_csv, header=None)
@@ -974,19 +975,22 @@ if '4' in steps:
         
         exes = np.arange(min(trust_ete),max(trust_ete),0.01)
         exp_whys = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2)
-        exp_upper = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_max)
-        exp_lower = trust_meansagsinus_one*np.exp(-(exes/1000)/trust_meanT2_min)
+        
+        exp_upper = trust_meansagsinus_MAX[0]*np.exp(-(exes/1000)/trust_meanT2_min)
+        exp_lower = trust_meansagsinus_MIN[0]*np.exp(-(exes/1000)/trust_meanT2_max)
         
     
         fig, ax = plt.subplots(1, 1, figsize=(5, 5))
         decay_plot_path = os.path.join(reporting_folder, f'decay_plot.png')
         
         ax.plot(exes, exp_whys, color='black') # fit
-        #ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
-        #ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
+        ax.plot(exes, exp_upper, color='gray', linestyle='dashed') # upper 95
+        ax.plot(exes, exp_lower, color='gray', linestyle='dashed')# lower 95
         
-        
-        ax.errorbar(trust_ete, trust_meansagsinus, yerr=trust_meansagsinus_ci, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
+        error_mins = trust_meansagsinus - trust_meansagsinus_MIN
+        error_maxes = trust_meansagsinus_MAX - trust_meansagsinus
+        error_bar_vals = np.array([error_mins, error_maxes])
+        ax.errorbar(trust_ete, trust_meansagsinus, yerr=error_bar_vals, fmt='ow', mec='black', ms=5, mew=1, ecolor='red', capsize=2)
         
         ax.set_title('TRUST fit')
         ax.set_xlabel('Effective echo time (ms)')
