@@ -60,8 +60,116 @@ def filter_zeroed_axial_slices(nii_data, thresh=0.99):
         return the_data
 
 
-def side_by_side_nii_image(niis, n_rows, cmaps, cmaxes=None, save=True, specified_frames=None, ax_font_size=32):
-    pass
+def compare_nii_images(niis, cmaps=[matplotlib.cm.gray,matplotlib.cm.inferno],
+                       cmaxes=[None,None], save=True,
+                       out_name=None, frames=6, ax_font_size=32):
+    
+    
+    plt.style.use('dark_background')
+        
+    if type(frames) == int:
+        nrows = frames
+    elif type(frames) == list:
+        nrows = len(frames)
+
+    fig, axs = plt.subplots(nrows, 3, figsize=(3*3,nrows*1.95))
+    fig.subplots_adjust(hspace=0.0, wspace=-0.4)
+    
+    data1 = nib.load(niis[0]).get_fdata()
+    data2 = nib.load(niis[1]).get_fdata()
+    datas = [data1,data2]
+    
+    num_slices = data1.shape[2] - 1 # num of axial slices
+    
+    if type(frames) == int:
+        a_fifth = int(num_slices * 0.15)
+        step = ((num_slices-a_fifth) - (0+a_fifth)) / (frames - 1)
+        selected_frames = [int((0+a_fifth) + step * i) for i in range(frames)]
+    else:
+        selected_frames = frames
+    
+    for cmap in cmaps:
+        cmap.set_bad('black',1.)
+    
+    for ax_row, f in zip(axs, selected_frames):
+        
+        ax_slice1 = ndimage.rotate(data1[:,:,f].T, 180)
+        ax_slice1[np.isclose(ax_slice1,0)] = np.nan
+        ax_slice1[ax_slice1 < 0] = np.nan
+        ax_slice1 = np.fliplr(ax_slice1) # convert to radiological orientation
+        
+        ax_slice2 = ndimage.rotate(data2[:,:,f].T, 180)
+        ax_slice2[np.isclose(ax_slice2,0)] = np.nan
+        ax_slice2[ax_slice2 < 0] = np.nan
+        ax_slice2 = np.fliplr(ax_slice2) # convert to radiological orientation
+        
+        
+        vvals = [None,None]
+        for i,val in enumerate(vvals):
+            cmax = cmaxes[i]
+            if cmaps[i] != matplotlib.cm.gray:
+                if cmax is not None:    
+                    vvals[i] = [0, cmax]
+                else:
+                    vvals[i] = [0, round(np.nanpercentile(datas[i], 99.5),2)]
+            
+            else:
+                if cmax is not None:
+                    vvals[i] = [0, round(np.nanpercentile(datas[i], cmax),2)]
+                else:
+                    vvals[i] = [0, round(np.nanpercentile(datas[i], 97.5),2)]
+        
+        #print(f'vvals: {vvals}')
+        
+        im1 = ax_row[0].imshow(ax_slice1, interpolation='nearest', cmap=cmaps[0], vmin=vvals[0][0], vmax=vvals[0][1])
+        ax_row[0].axis('off')
+        
+        im3 = ax_row[2].imshow(ax_slice2, interpolation='nearest', cmap=cmaps[1], vmin=vvals[1][0], vmax=vvals[1][1])
+        ax_row[2].axis('off')
+
+        im2p1 = ax_row[1].imshow(ax_slice1, interpolation='nearest', cmap=cmaps[0], vmin=vvals[0][0], vmax=vvals[0][1], alpha=1)
+        im2p2 = ax_row[1].imshow(ax_slice2, interpolation='nearest', cmap=cmaps[1], vmin=vvals[1][0], vmax=vvals[1][1], alpha=0.5)
+        ax_row[1].axis('off')
+        
+    vmax = vvals[1][1]
+    if vmax > 100:
+        rounder = 0
+        by = 20
+    elif vmax > 50:
+        rounder = 0
+        by = 10
+    elif vmax > 10:
+        rounder = 0
+        by = 5
+    elif vmax > 1:
+        rounder = 1
+        by = 0.5
+    else:
+        rounder = 2
+        by = 0.1
+    
+    vmax = round(vmax, rounder)
+
+    if cmaps[1] != matplotlib.cm.gray:
+            
+        tks = list(np.arange(0, vmax, by))
+        tks.append(vmax)
+        
+        if tks[-1] - tks[-2] < 0.35*by:
+            del tks[-2] # if the last two ticks are very close together, delete the penultimate tick
+        
+        cbar_ax = fig.add_axes([0.1,0.055,0.8,0.015])
+        fig.colorbar(im3, cbar_ax, orientation='horizontal', ticks=tks)
+    
+    #plt.tight_layout(0.2)
+    if save:
+        plt.savefig(out_name, dpi=200, bbox_inches='tight')
+    else:
+        plt.show()
+        
+    
+    plt.rcParams.update(plt.rcParamsDefault)
+    
 
 
 def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True, specified_frames=None, ax_font_size=32):
@@ -214,7 +322,7 @@ def nii_image(nii, dimensions, out_name, cmap, cmax=None, save=True, specified_f
     plt.subplots_adjust(wspace=0.000, hspace=0.000)
 
     if save:
-        plt.savefig(out_name)
+        plt.savefig(out_name, dpi=200)
     else:
         plt.show()
     

@@ -69,7 +69,7 @@ import matplotlib.pyplot as plt
 
 from helpers import get_terminal, str_time_elapsed
 import helpers as hp
-from report_image_generation import par2nii, nii_image
+from report_image_generation import par2nii, nii_image, compare_nii_images
 
 #sys.exit()
 wizard = """                
@@ -1068,9 +1068,12 @@ if '4' in steps:
     
         mni_folder = os.path.join(in_folder, 'Processed', 'CBF2mm')
         cbf_nii = os.path.join(mni_folder, f'{pt_id}_CBF_MNI_2mm.nii.gz')
+        t1_nii = os.path.join(in_folder, 'Processed', f'{pt_id}_3D_MNI_nonBET.nii.gz')
+        
         cbf_im = os.path.join(reporting_folder, 'cbf.png')
         
-        nii_image(cbf_nii, (3,3), cbf_im, cmap=matplotlib.cm.inferno, cmax=100, save=True, specified_frames=list(np.arange(12,72,7)), ax_font_size=16)
+        #nii_image(cbf_nii, (3,3), cbf_im, cmap=matplotlib.cm.inferno, cmax=100, save=True, specified_frames=list(np.arange(12,72,7)), ax_font_size=16)
+        compare_nii_images(niis=[t1_nii, cbf_nii], cmaxes=[None,100], out_name=cbf_im, save=True, frames=list(np.arange(17,77,10)))
         ##### CBF PAGE
         pdf.add_page()
         pdf.set_xy(0, 0)
@@ -1087,8 +1090,8 @@ if '4' in steps:
             
         pdf.cell(60)
         pdf.cell(90, 5, " ", 0, 2, 'C')
-        pdf.cell(-35)
-        pdf.image(cbf_im, x = None, y = None, w = 160, h = 0, type = '', link = '')
+        pdf.cell(-20)
+        pdf.image(cbf_im, x = None, y = None, w = 130, h = 0, type = '', link = '')
         pdf.set_font('arial', 'I', 12)
         #pdf.cell(160, 10, 'Cerebral blood flow (ml/100g/min)', 0, 0, 'C')
         
@@ -1120,29 +1123,30 @@ if '4' in steps:
                 break
         
     
+        table_height = 6
         pdf.cell(10)
-        pdf.cell(50, 7, 'Lobe', 1, 0, 'C')
-        pdf.cell(60, 7, 'CBF (ml/100g/min)', 1, 0, 'C')
-        pdf.cell(60, 7, 'Standard deviation', 1, 2, 'C')
+        pdf.cell(50, table_height, 'Lobe', 1, 0, 'C')
+        pdf.cell(60, table_height, 'CBF (ml/100g/min)', 1, 0, 'C')
+        pdf.cell(60, table_height, 'Standard deviation', 1, 2, 'C')
         pdf.cell(-110)
         pdf.set_font('arial', '', 12)
         for i, (name,val,std) in enumerate(zip(lobe_names, lobe_vals, lobe_stds)):
             
-            pdf.cell(50, 7, '%s' % (name), 1, 0, 'C')
+            pdf.cell(50, table_height, '%s' % (name), 1, 0, 'C')
             
             gofrac = val / max(lobe_vals)
             gofrac_std = std / max(lobe_stds)
             
             pdf.set_fill_color(184, 255, 208)
-            pdf.cell(60*gofrac, 7, ' ', 0, 0, 'L', fill=True)
-            pdf.cell(-60*gofrac, 7, ' ', 0, 0, 'L', fill=False)
-            pdf.cell(60, 7, '%s' % (str(round(val,1))), 1, 0, 'C')
+            pdf.cell(60*gofrac, table_height, ' ', 0, 0, 'L', fill=True)
+            pdf.cell(-60*gofrac, table_height, ' ', 0, 0, 'L', fill=False)
+            pdf.cell(60, table_height, '%s' % (str(round(val,1))), 1, 0, 'C')
             
             
             pdf.set_fill_color(255, 206, 133)
-            pdf.cell(60*gofrac_std, 7, ' ', 0, 0, 'L', fill=True)
-            pdf.cell(-60*gofrac_std, 7, ' ', 0, 0, 'L', fill=False)
-            pdf.cell(60, 7, '%s' % (str(round(std,1))), 1, 2, 'C')
+            pdf.cell(60*gofrac_std, table_height, ' ', 0, 0, 'L', fill=True)
+            pdf.cell(-60*gofrac_std, table_height, ' ', 0, 0, 'L', fill=False)
+            pdf.cell(60, table_height, '%s' % (str(round(std,1))), 1, 2, 'C')
             
             pdf.cell(-110)
     
