@@ -339,7 +339,7 @@ if contact_redcap:
             
             has_ans = False
             while not has_ans:
-                print(f"MR ID {pt_id} appears to correspond to scan number {which_scan.index(True)+1} for this patient")
+                print(f"MR ID {pt_id} appears to correspond to MR scan column {which_scan.index(True)+1} for this patient.")
                 print(f'(the mr_id was found in column {mri_cols[which_scan.index(True)]})')
                 if not auto:
                     ans = input(f'Please confirm that this is correct, especially if you intend to push processing results to REDCap or are using the database values for hct/pt type. [y/n]\n')

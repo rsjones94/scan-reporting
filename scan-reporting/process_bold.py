@@ -55,6 +55,8 @@ from helpers import get_terminal, str_time_elapsed, any_in_str, replace_in_ppt, 
 import helpers as hp
 from report_image_generation import par2nii, nii_image
 
+#sys.exit()
+
 inp = sys.argv
 bash_input = inp[1:]
 options, remainder = getopt.getopt(bash_input, "i:n:s:d:c:g", ["infolder=","name=",'steps=','dob=', 'clean', 'help'])
@@ -308,7 +310,67 @@ if '5' in steps:
         thresh_data = pd.read_csv(thresh_file, header=None, index_col=0)
         has_thresh_file = 1
     except FileNotFoundError:
-        pass
+        has_ans = False
+        do_search = False
+        while not has_ans:
+            ans = input(f'No thresh file found. Would you like to search for one?\n(y / n)\n')
+            if ans == 'n':
+                has_ans = True
+            elif ans =='y':
+                raw_id = os.path.basename(os.path.normpath(in_folder))
+                split_up = raw_id.split('_')
+                pt_basename = '_'.join(split_up[0:-1])
+                do_search = True
+                has_ans = True
+            else:
+                print('\nAnswer must be "y" or "n"')
+                
+        if do_search:
+            has_ans = False
+            while not has_ans:
+                ans = input(f'The ID basename is {pt_basename}. Please enter a scan number (e.g., 02) that you would like to try to grab a threshhold file from, or cancel.\n(0X / cancel)\n')
+                
+                if ans == 'cancel':
+                    print('Okay. We can make a thresh file from scratch.')
+                    has_ans = True
+                elif not ans.isdigit():
+                    print('\nAnswer must be composed of digits only.')
+                else:
+                    
+                    folder_to_look_for = f'{pt_basename}_{ans}'
+                    print(f'Searching for folders matching {folder_to_look_for}. This may take a minute....')
+                    
+                    f1 = '/Users/manusdonahue/Desktop/Projects/BOLD/Data/'
+                    f2 = '/Volumes/DonahueDataDrive/Data_sort/IC_Stenosis_Trial_ALL_DATA'
+                    potentials = hp.find_all_folders_named(folder_to_look_for, f1)
+                    potentials.extend(hp.find_all_folders_named(folder_to_look_for, f2))
+                    
+                    potential_threshes = [os.path.join(p, 'thresh_vals.csv') for p in potentials]
+                    potential_threshes = [p for p in potential_threshes if os.path.exists(p)]
+                    
+                    if len(potential_threshes) == 0:
+                        print("Sorry, I didn't find anything that matches.")
+                    else:
+                        print('I found some potential matches:')
+                        for i, fi in enumerate(potential_threshes):
+                            print(f'{i}:\n\t{fi}')
+                        has_subans = False
+                        while not has_subans:
+                            subans = input('Please enter the index of the file you want to use.\n(number / cancel)\n')
+                            if subans == 'cancel':
+                                has_subans = True
+                                continue
+                            try:
+                                winner = potential_threshes[int(subans)]
+                                shutil.copyfile(winner, thresh_file)
+                                thresh_data = pd.read_csv(thresh_file, header=None, index_col=0)
+                                has_thresh_file = 1
+                                has_subans = True
+                                has_ans = True
+                            except IndexError:
+                                print('Your input must be an integer matching the indices displayed or "cancel"')
+                            except ValueError:
+                                print('Your input must be an integer matching the indices displayed or "cancel"')
 
     if os.path.exists(reporting_folder):
         shutil.rmtree(reporting_folder)
@@ -351,9 +413,20 @@ if '5' in steps:
         im_name = os.path.join(reporting_folder, f'{subdict["basename"]}_report_image.png')
         thresh_vals.append(nii_image(new_name, subdict['dims'], im_name, cmap=subdict['cmap'], cmax=cmax))
         thresh_names.append(subdict["basename"])
-            
     
     thresh_dict = {key:val for key,val in zip(thresh_names, thresh_vals)}
+    
+    if has_thresh_file:
+        try:
+            thresh_dict['etco2min'] = float(thresh_data.loc['etco2min'])
+            thresh_dict['etco2max'] = float(thresh_data.loc['etco2max'])
+        except KeyError: # some older thresh files don't have entries for etco2
+            thresh_dict['etco2min'] = 30
+            thresh_dict['etco2max'] = 60
+    else:
+        thresh_dict['etco2min'] = 30
+        thresh_dict['etco2max'] = 60
+        
     thresh_ser = pd.Series(thresh_dict)
     thresh_ser.to_csv(thresh_file, header=False)
     
@@ -434,6 +507,18 @@ if '6' in steps:
     
     
     # make the etco2 trace
+    thresh_file = os.path.join(in_folder, 'thresh_vals.csv')
+    has_thresh_file = 0
+    try:
+        thresh_data = pd.read_csv(thresh_file, header=None, index_col=0)    
+        etmin = float(thresh_data.loc['etco2min'])  
+        etmax = float(thresh_data.loc['etco2max'])
+        has_thresh_file = 1
+    except FileNotFoundError:
+        print('No thresh file found. Using default threshes for EtCO2 trace.')
+        etmin = 30
+        etmax = 60
+    
     try:
         etco2_file = os.path.join(in_folder, 'etco2.csv')
         etco2_fig = os.path.join(reporting_folder, 'etco2.png')
@@ -447,6 +532,7 @@ if '6' in steps:
         plt.scatter(dynamics, co2, color='black')
         plt.ylabel('EtCO2 (mmHg)')
         plt.xlabel('Dynamic Scan')
+        plt.ylim(etmin, etmax)
         plt.tight_layout()
         plt.savefig(etco2_fig)
         plt.close()

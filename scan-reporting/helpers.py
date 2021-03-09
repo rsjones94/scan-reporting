@@ -13,6 +13,7 @@ import shutil
 import itertools
 import operator
 import re
+import glob
 
 import numpy as np
 from pptx import Presentation
@@ -370,3 +371,12 @@ def parse_scd_csv(in_csv, scan_index, std=False):
     
     return parsed
     
+def find_all_folders_named(folder_name, top_level_folder):
+    where_glob = os.path.join(top_level_folder, "**", folder_name)
+    potential = glob.glob(where_glob, recursive=True)
+    
+    return potential
+
+
+
+
