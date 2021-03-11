@@ -578,7 +578,11 @@ if '2' in steps:
             print(f'\nWARNING: TRUST source\n----- {trustsource} -----\nis NOT formatted correctly')
             has_ans = False
             while not has_ans:
-                ans = input(f'\nI can try to fix the filenames for you, or you can exit processing and do it yourself. [fix/exit/info]\n')
+                if not auto:
+                    ans = input(f'\nI can try to fix the filenames for you, or you can exit processing and do it yourself. [fix/exit/info]\n')
+                else:
+                    ans = 'fix'
+                    print(f'Auto response: {ans}')
                 if ans in ('fix','exit','info'):
                     if ans == 'exit':
                         has_ans = True
@@ -925,19 +929,32 @@ if '4' in steps:
     
     
     pdf.set_font('arial', 'B', 10)
-    pdf.cell(210/2, 6, f"TRUST Parameters", 0, 0, 'C')
-    pdf.cell(210/2, 6, f"ASL Parameters", 0, 2, 'C')
+    
+    trust_adder = asl_adder = ' (not run)'
+    asl_res = trust_res = asl_specs = trust_echoes = '---'
+    if do_run['trust']:
+        trust_adder = ''
+        trust_res = 'Spatial resolution: 2.875 x 2.875 x 5.0mm'
+        trust_echoes = 'Echo time range: [0, 40, 80, 160] ms'
+    if do_run['vol'] and do_run['asl']:
+        asl_adder = ''
+        asl_res = 'Spatial resolution: 3.0 x 3.0 x 8.0mm'
+        asl_specs = f'PLD, LD, TR: {pld}ms, {ld}ms, {tr}s'
+    
+    
+    pdf.cell(210/2, 6, f"TRUST Parameters{trust_adder}", 0, 0, 'C')
+    pdf.cell(210/2, 6, f"ASL Parameters{asl_adder}", 0, 2, 'C')
     pdf.cell(-(210/2), 6, f"", 0, 0, 'C')
     
     
     pdf.set_font('arial', '', 8)
     pdf.set_text_color(133, 133, 133)
-    pdf.cell(210/2, 4, f"Spatial resolution: 2.875 x 2.875 x 5.0mm", 0, 0, 'C')
-    pdf.cell(210/2, 4, f"Spatial resolution: 3.0 x 3.0 x 8.0mm", 0, 2, 'C')
+    pdf.cell(210/2, 4, f"{trust_res}", 0, 0, 'C')
+    pdf.cell(210/2, 4, f"{asl_res}", 0, 2, 'C')
     pdf.cell(-(210/2), 4, f"", 0, 0, 'C')
     
-    pdf.cell(210/2, 4, f"Echo time range: [0, 40, 80, 160] ms", 0, 0, 'C')
-    pdf.cell(210/2, 4, f"PLD, LD, TR: {pld}ms, {ld}ms, {tr}s", 0, 2, 'C') 
+    pdf.cell(210/2, 4, f"{trust_echoes}", 0, 0, 'C')
+    pdf.cell(210/2, 4, f"{asl_specs}", 0, 2, 'C') 
     
     pdf.cell(210/2, 4, f"", 0, 0, 'C')
     pdf.cell(210/2, 4, f"Labeling type: pCASL", 0, 2, 'C')
